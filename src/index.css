@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #0a0e1a;
+    --color-bg-elev: #101522;
+    --color-bg-map: #0b1020;
+    --color-ink: #f7f8fb;
+    --color-ink-dim: #a8b0c2;
+    --color-ink-mute: #6b7488;
+    --color-amber-400: #ffd470;
+    --color-amber-500: #f5b83a;
+    --color-amber-600: #c28a1e;
+    --color-line: #1b2235;
+
+    --ease-camera: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-arrival: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-ui: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+    --dur-instant: 120ms;
+    --dur-fast: 200ms;
+    --dur-base: 320ms;
+    --dur-slow: 480ms;
+    --dur-flyto: 1400ms;
+    --dur-pulse: 720ms;
+
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    background: var(--color-bg);
+    color: var(--color-ink);
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Reel route locks scroll + disables OS gestures that fight the gesture machine. */
+  .reel-root {
+    height: 100dvh;
+    height: 100svh;
+    width: 100vw;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Static fallback restores native scroll. */
+  .reel-static-root {
+    min-height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+}
+
+@layer components {
+  .glass-pill {
+    background: color-mix(in srgb, var(--color-bg-elev) 70%, transparent);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
+  }
+
+  .scrim-bottom {
+    background: linear-gradient(
+      to top,
+      rgba(10, 14, 26, 0.85) 0%,
+      rgba(10, 14, 26, 0.55) 35%,
+      rgba(10, 14, 26, 0) 65%
+    );
+  }
+
+  .scrim-top {
+    background: linear-gradient(
+      to bottom,
+      rgba(10, 14, 26, 0.65) 0%,
+      rgba(10, 14, 26, 0) 80%
+    );
+  }
+}
+
+@layer utilities {
+  .text-display {
+    font-family: 'Inter Tight', Inter, system-ui, sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 0.95;
+  }
+
+  .text-caps {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Arrival pulse — DESIGN.md signature easing. Used on the amber pin when the camera lands. */
+  @keyframes arrival-pulse {
+    0% {
+      transform: scale(0.6);
+      opacity: 0;
+    }
+    55% {
+      transform: scale(1.12);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .animate-arrival {
+    animation: arrival-pulse var(--dur-pulse) var(--ease-arrival) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
