@@ -40,6 +40,12 @@ Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude
 - `/gstack-upgrade` - Upgrade gstack
 - `/learn` - Learn from session
 
+## Design System
+
+Always read DESIGN.md before making any visual or UI decisions. All font choices, colors, spacing, motion, and aesthetic direction are defined there. Do not deviate without explicit user approval. In QA mode, flag any code that doesn't match DESIGN.md.
+
+The memorable thing is **the motion** (the map flies like a movie). Three locked risks: single amber accent, arrival-pulse signature easing, no empty-state illustrations on public surfaces.
+
 ## Skill routing
 
 When the user's request matches an available skill, ALWAYS invoke it using the Skill
