@@ -20,7 +20,15 @@ export function ChapterOverlay({ chapter, chapterNumber, totalChapters }: Props)
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
-      <div className="scrim-bottom px-5 pb-8 pt-32">
+      {/* Bottom padding clears the chapter rail (which sits at safe-area + 32px,
+          2px tall) plus ~32px of breathing room. Top padding gives the scrim
+          a long fade-up so type stays legible against bright photos. */}
+      <div
+        className="scrim-bottom px-5 pt-32"
+        style={{
+          paddingBottom: 'calc(max(env(safe-area-inset-bottom), 32px) + 48px)',
+        }}
+      >
         {/* Photo stack — two cards rotated for editorial polaroid feel */}
         <div className="relative h-32 mb-5 ml-1">
           {chapter.photos.slice(0, 2).map((photo, i) => (
