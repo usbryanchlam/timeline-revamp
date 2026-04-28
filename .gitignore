@@ -43,3 +43,6 @@ coverage/
 
 # gstack scratch
 .gstack/
+
+# Local progress checkpoints (int-compact output)
+progress*.md
