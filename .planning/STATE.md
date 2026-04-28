@@ -10,9 +10,9 @@ See: `.planning/PROJECT.md` (updated 2026-04-27)
 ## Current Position
 
 Phase: **2 of 12** (Reel polish + perf budget)
-Plan: 0 of 5 (planning not yet started — run `/gsd-plan-phase 2`)
-Status: **Ready to plan**
-Last activity: 2026-04-27 — Phase 1 closed; `.planning/` initialized via `/gsd-import` path 1 (hand-import from gstack docs).
+Plan: 0 of 5 (planning complete; ready to execute first plan)
+Status: **Ready to execute**
+Last activity: 2026-04-27 — Phase 2 planned. Five PLAN.md files written to `.planning/phases/02-reel-polish/` via sequential in-context fallback (gsd-planner subagent unavailable in runtime). Wave 1: 02-01, 02-04, 02-05 (independent). Wave 2: 02-02 (depends on 02-01). Wave 3: 02-03 (depends on 02-01, 02-02).
 
 Progress: [█░░░░░░░░░░░] 8% (1 of 12 phases complete)
 
@@ -85,9 +85,9 @@ Items acknowledged and carried forward:
 ## Session Continuity
 
 Last session: 2026-04-27
-Stopped at: `.planning/` initialized via path-1 hand-import. PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md written. Codebase map already in place from earlier `/gsd-map-codebase` run.
+Stopped at: Phase 2 fully planned. 5 PLAN.md files (773 lines total) written to `.planning/phases/02-reel-polish/`. Each is a self-contained executable prompt with frontmatter, task breakdown with action/verify/acceptance, must_haves block, and gating checkpoints where user input is needed.
 
-**Next action**: `/gsd-plan-phase 2` to generate the five Phase 2 plans (MapTiler, dynamic-import, motion polish, tests, StateBadge gate).
+**Next action**: Execute the first wave-1 plan. Recommended start: `/gsd-execute-phase 2 --plan 02-04` (Vitest setup + state machine tests — pure code, no external blockers, locks in W1 regression safety) OR `/gsd-execute-phase 2 --plan 02-05` (StateBadge gating — 3 tasks, ~10 min). 02-01 (MapTiler) is also wave-1 but blocks on user signing up at maptiler.com first.
 
 ## Notable Artifacts
 
