@@ -6,6 +6,8 @@ import {
   LONG_PRESS_MS,
   MAP_INTERACT_IDLE_MS,
   ORIENTATION_SETTLE_MS,
+  TAP_MAX_DURATION_MS,
+  TAP_MAX_TRAVEL_PX,
   transition,
   type ReelEvent,
   type ReelState,
@@ -102,6 +104,9 @@ export function useGestureMachine({
   // --- Pointer event handlers ----------------------------------------------
   const onPointerDown = useCallback(
     (e: PointerEvent) => {
+      // Only count primary pointer types we care about. (mouse/touch/pen.)
+      // Ignore pointers that originated outside our element — pointerdown is
+      // attached to the element, so we can trust them.
       // Yield to OS for 3+ fingers (accessibility gestures). Do not preventDefault.
       const wouldBeCount = pointersRef.current.size + 1;
       if (wouldBeCount >= 3) {
@@ -136,6 +141,8 @@ export function useGestureMachine({
 
   const onPointerMove = useCallback(
     (e: PointerEvent) => {
+      // Window-level listener — only react to pointers we already started
+      // tracking via pointerdown on the reel element.
       const sample = pointersRef.current.get(e.pointerId);
       if (!sample) return;
       const dx = e.clientX - sample.lastX;
@@ -169,21 +176,36 @@ export function useGestureMachine({
   const onPointerUpOrCancel = useCallback(
     (e: PointerEvent) => {
       const sample = pointersRef.current.get(e.pointerId);
+      // Pointer not tracked by us — likely started outside the reel. Ignore.
+      if (!sample) return;
       pointersRef.current.delete(e.pointerId);
       const remaining = pointersRef.current.size;
 
-      let flickVy = 0;
-      if (sample) {
-        const dt = Math.max(1, e.timeStamp - sample.startT);
-        flickVy = (sample.lastY - sample.startY) / dt; // px per ms (signed)
-      }
+      // Detect a clean tap before we dispatch — if it was, we'll route to
+      // TAP_BACKGROUND instead of just POINTER_UP. A clean tap is:
+      // single-finger gesture, short duration, no real movement.
+      const duration = e.timeStamp - sample.startT;
+      const travel = Math.hypot(
+        sample.lastX - sample.startX,
+        sample.lastY - sample.startY,
+      );
+      const isCleanTap =
+        remaining === 0 &&
+        duration < TAP_MAX_DURATION_MS &&
+        travel < TAP_MAX_TRAVEL_PX &&
+        // Only trip the tap if we never promoted to SCRUBBING / MAP_INTERACT.
+        (stateRef.current.name === 'IDLE' ||
+          stateRef.current.name === 'PAUSED');
 
       dispatch({
         type: 'POINTER_UP',
         pointers: remaining + 1, // pointers count BEFORE this lift
         t: e.timeStamp,
-        flickVy,
       });
+
+      if (isCleanTap) {
+        dispatch({ type: 'TAP_BACKGROUND' });
+      }
 
       if (remaining === 0) {
         clear(longPressTimerRef);
@@ -193,26 +215,31 @@ export function useGestureMachine({
   );
 
   // --- Bind to element -----------------------------------------------------
+  // pointerdown lives on the element so we only start tracking gestures that
+  // begin INSIDE the reel surface. pointermove/up/cancel live on the window
+  // with capture: true so MapLibre's internal setPointerCapture can't swallow
+  // them while in MAP_INTERACT — otherwise pointerCount would never decrement
+  // and we'd be stuck in MAP_INTERACT forever.
   const bind = useCallback(
     (el: HTMLElement | null) => {
-      // Detach old element handlers.
       const prev = elRef.current;
-      if (prev) {
-        prev.removeEventListener('pointerdown', onPointerDown);
-        prev.removeEventListener('pointermove', onPointerMove);
-        prev.removeEventListener('pointerup', onPointerUpOrCancel);
-        prev.removeEventListener('pointercancel', onPointerUpOrCancel);
-      }
+      if (prev) prev.removeEventListener('pointerdown', onPointerDown);
       elRef.current = el;
-      if (el) {
-        el.addEventListener('pointerdown', onPointerDown, { passive: true });
-        el.addEventListener('pointermove', onPointerMove, { passive: true });
-        el.addEventListener('pointerup', onPointerUpOrCancel, { passive: true });
-        el.addEventListener('pointercancel', onPointerUpOrCancel, { passive: true });
-      }
+      if (el) el.addEventListener('pointerdown', onPointerDown, { passive: true });
     },
-    [onPointerDown, onPointerMove, onPointerUpOrCancel],
+    [onPointerDown],
   );
+
+  useEffect(() => {
+    window.addEventListener('pointermove', onPointerMove, { capture: true, passive: true });
+    window.addEventListener('pointerup', onPointerUpOrCancel, { capture: true, passive: true });
+    window.addEventListener('pointercancel', onPointerUpOrCancel, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove, { capture: true } as EventListenerOptions);
+      window.removeEventListener('pointerup', onPointerUpOrCancel, { capture: true } as EventListenerOptions);
+      window.removeEventListener('pointercancel', onPointerUpOrCancel, { capture: true } as EventListenerOptions);
+    };
+  }, [onPointerMove, onPointerUpOrCancel]);
 
   // --- Page lifecycle listeners (mounted once) -----------------------------
   useEffect(() => {

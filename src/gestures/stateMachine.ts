@@ -32,7 +32,7 @@ export type ReelEvent =
   // Touch / pointer events from DOM
   | { type: 'POINTER_DOWN'; pointers: number; t: number }
   | { type: 'POINTER_MOVE'; pointers: number; dx: number; dy: number; t: number }
-  | { type: 'POINTER_UP'; pointers: number; t: number; flickVy: number }
+  | { type: 'POINTER_UP'; pointers: number; t: number }
   // Tap classifications (from the React hook based on duration/distance)
   | { type: 'TAP_BACKGROUND' }
   // Timed transitions
@@ -50,7 +50,11 @@ export type ReelEvent =
 
 export const SCRUB_TOTAL_CHAPTERS = 10 as const;
 export const FLICK_THRESHOLD_PX = 30 as const;
-export const FLICK_THRESHOLD_VY = 0.6 as const; // px/ms approx
+/** Spec: "vertical flick ≥30px in <300ms". The duration ceiling IS the velocity proxy. */
+export const FLICK_MAX_DURATION_MS = 300 as const;
+/** A clean tap: short, almost no movement, single finger. */
+export const TAP_MAX_DURATION_MS = 200 as const;
+export const TAP_MAX_TRAVEL_PX = 10 as const;
 export const LONG_PRESS_MS = 200 as const;
 export const MAP_INTERACT_IDLE_MS = 3000 as const;
 export const ORIENTATION_SETTLE_MS = 300 as const;
@@ -201,9 +205,12 @@ export function transition(
       const remaining = Math.max(0, event.pointers - 1);
 
       // Vertical flick → CHAPTER_SWIPE (only from IDLE or PAUSED with single finger).
+      // Spec: ≥30px of vertical travel in <300ms. Duration is the velocity proxy.
+      const duration =
+        state.gestureStartedAt != null ? event.t - state.gestureStartedAt : Infinity;
       const isFlick =
         Math.abs(state.gestureDy) >= FLICK_THRESHOLD_PX &&
-        Math.abs(event.flickVy) >= FLICK_THRESHOLD_VY;
+        duration < FLICK_MAX_DURATION_MS;
       const wasSingleFinger = state.pointerCount === 1 && remaining === 0;
 
       if (

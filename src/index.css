@@ -51,9 +51,11 @@
     width: 100vw;
     overflow: hidden;
     overscroll-behavior: none;
-    touch-action: manipulation;
+    /* Fully custom gesture surface — surrender all default browser touch behaviors. */
+    touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
   }
 

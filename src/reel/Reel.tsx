@@ -19,7 +19,7 @@ import { StateBadge } from './StateBadge';
 export function Reel() {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const { state, dispatch, bind } = useGestureMachine({
+  const { state, bind } = useGestureMachine({
     totalChapters: SEEDED_CITIES.length,
   });
 
@@ -42,16 +42,6 @@ export function Reel() {
     // map (interactive: false). We'll wire camera-ownership signals in W2.
   }, []);
 
-  // Click handler for tap-to-pause-toggle on the background.
-  const onBackgroundClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      // Ignore clicks that bubbled from interactive children (the CTA pill).
-      if ((e.target as HTMLElement).closest('a, button')) return;
-      dispatch({ type: 'TAP_BACKGROUND' });
-    },
-    [dispatch],
-  );
-
   // Aria-live announcement on chapter change.
   const liveRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -67,7 +57,6 @@ export function Reel() {
   return (
     <main
       ref={setContainer}
-      onClick={onBackgroundClick}
       className="reel-root relative bg-bg"
       role="region"
       aria-label="Travel reel"
