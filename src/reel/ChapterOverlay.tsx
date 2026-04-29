@@ -1,3 +1,9 @@
+import { motion } from 'framer-motion';
+import {
+  cityNameAndCaption,
+  photoStackContainer,
+  photoStackItem,
+} from '@/motion/variants';
 import type { CityChapter } from '@/types/reel';
 
 interface Props {
@@ -12,8 +18,8 @@ interface Props {
  * any map background.
  *
  * The overlay is keyed on `chapter.id` upstream so React replaces the DOM on
- * each chapter change — that lets the arrival-pulse animation re-fire without
- * orchestration glue here.
+ * each chapter change — that re-mount restarts the Framer variants from
+ * "hidden" → "visible", which is the trigger for the staggered arrival.
  */
 export function ChapterOverlay({ chapter, chapterNumber, totalChapters }: Props) {
   const formatted = formatArrivedAt(chapter.arrivedAt);
@@ -29,22 +35,28 @@ export function ChapterOverlay({ chapter, chapterNumber, totalChapters }: Props)
           paddingBottom: 'calc(max(env(safe-area-inset-bottom), 32px) + 48px)',
         }}
       >
-        {/* Photo stack — two cards rotated for editorial polaroid feel */}
-        <div className="relative h-32 mb-5 ml-1">
+        {/* Photo stack — two cards rotated for editorial polaroid feel.
+            Framer drives the staggered arrival via the parent container variant. */}
+        <motion.div
+          className="relative h-32 mb-5 ml-1"
+          variants={photoStackContainer}
+          initial="hidden"
+          animate="visible"
+        >
           {chapter.photos.slice(0, 2).map((photo, i) => (
-            <div
+            <motion.div
               key={photo.id}
-              className="absolute top-0 left-0 w-24 h-32 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.45)] animate-arrival"
+              className="absolute top-0 left-0 w-24 h-32 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
+              variants={photoStackItem}
               style={{
                 background: `linear-gradient(135deg, ${photo.gradient[0]} 0%, ${photo.gradient[1]} 100%)`,
                 transform: `translateX(${i * 22}px) rotate(${i === 0 ? -4 : 6}deg)`,
-                animationDelay: `${i * 80}ms`,
               }}
               role="img"
               aria-label={photo.alt}
             />
           ))}
-        </div>
+        </motion.div>
 
         {/* Chapter counter + date */}
         <div className="text-caps text-[10px] text-amber-400 mb-2">
@@ -53,17 +65,27 @@ export function ChapterOverlay({ chapter, chapterNumber, totalChapters }: Props)
         </div>
 
         {/* City name — the brand element */}
-        <h1 className="text-display text-[clamp(40px,11vw,72px)] text-ink animate-arrival">
+        <motion.h1
+          className="text-display text-[clamp(40px,11vw,72px)] text-ink"
+          variants={cityNameAndCaption}
+          initial="hidden"
+          animate="visible"
+        >
           {chapter.name}
           <span className="text-ink-dim ml-2 text-[0.4em] align-middle font-medium tracking-normal">
             {chapter.country}
           </span>
-        </h1>
+        </motion.h1>
 
         {/* Caption */}
-        <p className="mt-3 max-w-[28ch] text-[15px] leading-snug text-ink-dim">
+        <motion.p
+          className="mt-3 max-w-[28ch] text-[15px] leading-snug text-ink-dim"
+          variants={cityNameAndCaption}
+          initial="hidden"
+          animate="visible"
+        >
           {chapter.caption}
-        </p>
+        </motion.p>
       </div>
     </div>
   );
