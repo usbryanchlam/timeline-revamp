@@ -17,12 +17,6 @@
 - Impact: cannot demonstrate cinematic city-block landings. W1 zooms artificially capped at 4–5.
 - Fix approach: sign up MapTiler (free 100k/mo), put key in `VITE_MAPTILER_KEY`, swap style URL in `MapCanvas.tsx`. Restore zooms to 12–13. ~10 minutes. Scheduled early W2.
 
-**`StateBadge` is ungated:**
-- Issue: `src/reel/StateBadge.tsx` always renders the dev-only state pill in production builds.
-- Why: needed it visible during W1 acceptance testing on iPhone.
-- Impact: ships a dev affordance to public visitors; small but visible.
-- Fix approach: either gate behind `?debug=1` query param, behind `import.meta.env.DEV`, or remove entirely once W2 polish is complete. Scheduled W2.
-
 **`src/motion/` is empty:**
 - Issue: directory created in mental architecture, has no files.
 - Why: motion tokens currently live as CSS custom properties in `index.css`; centralizing JS-side constants wasn't urgent.
@@ -104,3 +98,8 @@ W1 misses all of these. They're targeted by W2 polish, not before.
 - **`StrictMode` is on** — double-effect in dev is expected, not a bug.
 - **There is no router yet.** W3 adds React Router v7. Until then, `App.tsx` picks one of two reel components based on a media query.
 - **gstack docs are primary, repo `docs/` is a snapshot.** Edits to `docs/plan.md` in the repo won't propagate to gstack; either edit the gstack source or sync afterward. README documents the pattern.
+
+## Resolved
+
+**`StateBadge` is ungated (2026-04-27):**
+Closed in 02-05 — StateBadge now self-gates via `import.meta.env.PROD`.
