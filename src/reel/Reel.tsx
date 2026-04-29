@@ -1,11 +1,19 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef } from 'react';
 import { SEEDED_CITIES } from '@/data/seeded-cities';
 import { useGestureMachine } from '@/gestures/useGestureMachine';
-import { MapCanvas } from './MapCanvas';
+import { MapPoster } from './MapPoster';
 import { ChapterOverlay } from './ChapterOverlay';
 import { ChapterRail } from './ChapterRail';
 import { CTAPill } from './CTAPill';
 import { StateBadge } from './StateBadge';
+
+// Defer MapLibre + MapCanvas to a separate chunk so the LCP poster paints first.
+// The Suspense fallback renders <MapPoster />, which has identical positioning
+// to MapCanvas — when the chunk arrives and the canvas mounts, the swap is
+// visually seamless (no layout shift, same bg-bg-map background).
+const MapCanvas = lazy(() =>
+  import('./MapCanvas').then((m) => ({ default: m.MapCanvas })),
+);
 
 /**
  * Full-bleed cinematic reel. Single route, no router yet. Owns:
@@ -61,12 +69,14 @@ export function Reel() {
       role="region"
       aria-label="Travel reel"
     >
-      <MapCanvas
-        chapters={SEEDED_CITIES}
-        chapterIndex={state.chapterIndex}
-        stateName={state.name}
-        onUserMapInteract={onUserMapInteract}
-      />
+      <Suspense fallback={<MapPoster />}>
+        <MapCanvas
+          chapters={SEEDED_CITIES}
+          chapterIndex={state.chapterIndex}
+          stateName={state.name}
+          onUserMapInteract={onUserMapInteract}
+        />
+      </Suspense>
 
       {/* Top scrim for legibility of CTA + state badge */}
       <div className="scrim-top pointer-events-none absolute inset-x-0 top-0 h-40 z-[5]" />
