@@ -6,11 +6,9 @@ import type { CityChapter } from '@/types/reel';
  * for now each chapter ships two gradient placeholders (ramped from the chapter's
  * mood color into deep navy) so the photo-stack composition reads at the right size.
  *
- * Zoom note: W1 uses MapLibre's free `demotiles` style which only ships world-level
- * polygons (continents, country borders) and runs out of detail past ~zoom 5.
- * So zooms are intentionally 4-5 here — the camera flies between continents and
- * lands looking down at recognizable country shapes. W2 swaps to MapTiler vector
- * tiles, at which point we restore zoom 12-13 for city-block-level cinematic landings.
+ * Zoom note: chapters land at zoom 11-13.5 so MapTiler vector tiles render
+ * city-block-level detail (streets, place labels) under the photo stack. The
+ * camera arrives high and pitched for that Apple-Maps-Flyover signature.
  */
 export const SEEDED_CITIES: readonly CityChapter[] = [
   {
@@ -18,8 +16,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Tokyo',
     country: 'Japan',
     center: [139.7671, 35.6812],
-    zoom: 4.5,
-    pitch: 50,
+    zoom: 12.5,
+    pitch: 55,
     bearing: -18,
     arrivedAt: '2024-03-12',
     caption: 'Neon under rain. Convenience-store onigiri at 2am.',
@@ -33,8 +31,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Kyoto',
     country: 'Japan',
     center: [135.7681, 35.0116],
-    zoom: 5,
-    pitch: 48,
+    zoom: 13,
+    pitch: 50,
     bearing: 24,
     arrivedAt: '2024-03-18',
     caption: 'Bamboo grove before the tour buses arrived.',
@@ -48,8 +46,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Seoul',
     country: 'South Korea',
     center: [126.978, 37.5665],
-    zoom: 4.5,
-    pitch: 45,
+    zoom: 12,
+    pitch: 48,
     bearing: -8,
     arrivedAt: '2024-04-05',
     caption: 'Grilled pork belly and a karaoke room past midnight.',
@@ -63,8 +61,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Reykjavik',
     country: 'Iceland',
     center: [-21.9426, 64.1466],
-    zoom: 4,
-    pitch: 55,
+    zoom: 11,
+    pitch: 60,
     bearing: 12,
     arrivedAt: '2024-06-21',
     caption: 'Midnight sun. The horizon refused to set.',
@@ -78,8 +76,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Lisbon',
     country: 'Portugal',
     center: [-9.1393, 38.7223],
-    zoom: 4.5,
-    pitch: 50,
+    zoom: 13,
+    pitch: 55,
     bearing: -22,
     arrivedAt: '2024-07-09',
     caption: 'Pastel de nata still warm from the oven.',
@@ -93,8 +91,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Marrakech',
     country: 'Morocco',
     center: [-7.9811, 31.6295],
-    zoom: 4.5,
-    pitch: 48,
+    zoom: 13.5,
+    pitch: 50,
     bearing: 30,
     arrivedAt: '2024-09-14',
     caption: 'Lost in the souk. Found mint tea instead.',
@@ -108,8 +106,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Cape Town',
     country: 'South Africa',
     center: [18.4241, -33.9249],
-    zoom: 4,
-    pitch: 55,
+    zoom: 11.5,
+    pitch: 58,
     bearing: -15,
     arrivedAt: '2024-10-22',
     caption: 'Table Mountain, no clouds, gallery for the day.',
@@ -123,8 +121,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Queenstown',
     country: 'New Zealand',
     center: [168.6626, -45.0312],
-    zoom: 4,
-    pitch: 58,
+    zoom: 12,
+    pitch: 62,
     bearing: 45,
     arrivedAt: '2025-01-08',
     caption: 'Lake Wakatipu. Quiet that you can hear.',
@@ -138,8 +136,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Cusco',
     country: 'Peru',
     center: [-71.9675, -13.5319],
-    zoom: 4.5,
-    pitch: 52,
+    zoom: 13,
+    pitch: 55,
     bearing: -10,
     arrivedAt: '2025-03-11',
     caption: 'Three thousand four hundred meters. Coca leaves help.',
@@ -153,8 +151,8 @@ export const SEEDED_CITIES: readonly CityChapter[] = [
     name: 'Banff',
     country: 'Canada',
     center: [-115.5708, 51.1784],
-    zoom: 4,
-    pitch: 60,
+    zoom: 11,
+    pitch: 65,
     bearing: 28,
     arrivedAt: '2025-08-02',
     caption: 'Lake Louise the color of a postcard. Worth the drive.',

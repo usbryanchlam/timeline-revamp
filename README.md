@@ -36,3 +36,10 @@ bun run dev      # http://localhost:5173
 bun run build
 bun run typecheck
 ```
+
+### Map tiles
+
+By default the reel falls back to MapLibre's public demotiles (gray world-level
+polygons — fine for offline dev but not cinematic). For the real experience,
+sign up at [maptiler.com](https://www.maptiler.com/) (free tier: 100k requests/mo)
+and put `VITE_MAPTILER_KEY=<your-key>` in `.env.local` — see `.env.example`.

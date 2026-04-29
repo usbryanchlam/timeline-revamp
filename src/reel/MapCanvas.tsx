@@ -3,7 +3,22 @@ import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { CityChapter, ReelStateName } from '@/types/reel';
 
-const DEMOTILES_STYLE = 'https://demotiles.maplibre.org/style.json';
+// Tile source: prefer MapTiler vector tiles (cinematic city-block detail) when
+// VITE_MAPTILER_KEY is set, fall back to MapLibre's public demotiles otherwise
+// so dev still renders without an account. Sign up at https://www.maptiler.com/
+// (free 100k requests/mo) and paste the key into .env.local.
+const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+const STYLE_URL = MAPTILER_KEY
+  ? `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`
+  : 'https://demotiles.maplibre.org/style.json';
+
+if (!MAPTILER_KEY && typeof window !== 'undefined') {
+  // Single warning at module load; never inside the render path.
+  console.warn(
+    '[MapCanvas] VITE_MAPTILER_KEY not set — falling back to demotiles. ' +
+      'See .env.example for setup.',
+  );
+}
 
 // Apple-Maps-Flyover-ish curve for camera flights. MapLibre's flyTo accepts a
 // numeric `curve` (zoom-out arc) and a custom `easing` function.
@@ -39,7 +54,7 @@ export function MapCanvas({ chapters, chapterIndex, stateName, onUserMapInteract
 
     const map = new maplibregl.Map({
       container,
-      style: DEMOTILES_STYLE,
+      style: STYLE_URL,
       center: first.center as [number, number],
       zoom: 1.4, // start zoomed out — first arrival is part of the show
       pitch: 0,
