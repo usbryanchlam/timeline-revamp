@@ -22,8 +22,8 @@ if (!MAPTILER_KEY && typeof window !== 'undefined') {
 
 // Apple-Maps-Flyover-ish curve for camera flights. MapLibre's flyTo accepts a
 // numeric `curve` (zoom-out arc) and a custom `easing` function.
-const ARRIVAL_CURVE = 1.42;
-const FLY_DURATION_MS = 1400;
+const ARRIVAL_CURVE = 1.6;
+const FLY_DURATION_MS = 1800;
 
 // cubic-bezier(0.16, 1, 0.3, 1) approximation for MapLibre's easing(t) -> t.
 // MapLibre passes a 0..1 parameter and expects a 0..1 output.
