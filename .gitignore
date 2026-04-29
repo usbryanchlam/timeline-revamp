@@ -46,3 +46,6 @@ coverage/
 
 # Local progress checkpoints (int-compact output)
 progress*.md
+
+# Git worktrees (superpowers skill)
+.worktrees/
