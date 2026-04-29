@@ -58,7 +58,7 @@ export const TAP_MAX_TRAVEL_PX = 10 as const;
 export const LONG_PRESS_MS = 200 as const;
 export const MAP_INTERACT_IDLE_MS = 3000 as const;
 export const ORIENTATION_SETTLE_MS = 300 as const;
-export const FLY_DURATION_MS = 1400 as const;
+export const FLY_DURATION_MS = 1800 as const;
 
 export function initialState(chapterCount: number): ReelState {
   return {

@@ -46,7 +46,7 @@ interface Result {
  *
  * Side effects this hook owns:
  *   - long-press timer (200 ms)
- *   - chapter-fly-done timer (1400 ms after a CHAPTER_SWIPE)
+ *   - chapter-fly-done timer (1800 ms after a CHAPTER_SWIPE)
  *   - map-interact-idle timer (3000 ms after MAP_INTERACT pointerup)
  *   - orientation-settle timer (300 ms)
  *   - auto-play tick in IDLE
