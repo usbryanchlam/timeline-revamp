@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import type { CityChapter, ReelStateName } from '@/types/reel';
 
 // Tile source: prefer MapTiler vector tiles (cinematic city-block detail) when
