@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import type { CityChapter, ReelStateName } from '@/types/reel';
 
 // Tile source: prefer MapTiler vector tiles (cinematic city-block detail) when
@@ -24,10 +23,6 @@ if (!MAPTILER_KEY && typeof window !== 'undefined') {
 // numeric `curve` (zoom-out arc) and a custom `easing` function.
 const ARRIVAL_CURVE = 1.6;
 const FLY_DURATION_MS = 1800;
-
-// Mirrors --color-bg-map in src/index.css. Kept as a constant here so the
-// MapLibre sky tint stays in lockstep with the app background token.
-const BG_MAP_HEX = '#0b1020';
 
 // cubic-bezier(0.16, 1, 0.3, 1) approximation for MapLibre's easing(t) -> t.
 // MapLibre passes a 0..1 parameter and expects a 0..1 output.
@@ -77,18 +72,6 @@ export function MapCanvas({ chapters, chapterIndex, stateName, onUserMapInteract
     // up to the gesture machine via the parent callback.
     map.on('dragstart', () => onUserMapInteract?.());
     map.on('zoomstart', () => onUserMapInteract?.());
-
-    // Tint sky to bg-map so high-pitch frames blend with app chrome.
-    map.on('load', () => {
-      map.setSky({
-        'sky-color': BG_MAP_HEX,
-        'horizon-color': BG_MAP_HEX,
-        'fog-color': BG_MAP_HEX,
-        'sky-horizon-blend': 0.5,
-        'horizon-fog-blend': 0.6,
-        'fog-ground-blend': 0.5,
-      });
-    });
 
     return () => {
       map.remove();
