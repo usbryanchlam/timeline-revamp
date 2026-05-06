@@ -85,6 +85,16 @@
     overflow-y: auto;
     overscroll-behavior-y: contain;
   }
+
+  /* When the reel renders inside AppLayout (`/app/`), the BottomNav (fixed,
+     h-16 = 64px) would otherwise cover the ChapterRail (anchored at bottom).
+     Push the rail above the nav by reserving its height + safe-area padding.
+     `!important` is required because ChapterRail sets `bottom` via an inline
+     style, and inline styles outrank normal class rules. The override is
+     scoped to `.app-reel-host` so the public `/` reel is unaffected. */
+  .app-reel-host [data-chapter-rail] {
+    bottom: calc(4rem + max(env(safe-area-inset-bottom), 32px)) !important;
+  }
 }
 
 @layer components {
