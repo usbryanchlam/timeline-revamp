@@ -3,6 +3,7 @@ import containerQueries from '@tailwindcss/container-queries';
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: 'media',
   theme: {
     extend: {
       fontFamily: {
