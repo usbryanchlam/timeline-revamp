@@ -5,36 +5,37 @@
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 3 — App shell (React Router v7, route guards, theme tokens).
+**Current focus:** Phase 4 — Backend skeleton + Auth0 wiring.
 
 ## Current Position
 
-Phase: **3 of 12** (App shell)
-Plan: 0 of N (not yet planned)
+Phase: **4 of 12** (Backend skeleton + Auth0 wiring)
+Plan: 0 of 2 (planning ready to start)
 Status: **Ready to plan**
-Last activity: 2026-04-30 — Phase 2 closed out. Six plans landed (02-01 through 02-05 + 02-07-fix-lazy hotfix). One dead-end intermediate (02-06-skyfix, reverted in 02-07). User confirmed end-to-end map rendering works on iPhone Safari + Chrome desktop. Manual Lighthouse audit deferred but not blocking.
+Last activity: 2026-05-06 — Phase 3 closed out. Three plans landed (03-01 router, 03-02 nav + auth seam + collision fix, 03-03 light/dark theme + amber reconciliation). Wave 1 dispatched in parallel via superpowers/dispatching-parallel-agents (03-01 + 03-03), wave 2 solo (03-02). Plan-checker iteration: round 1 REVISE (3 blockers + 3 warnings), round 2 PASS.
 
-Progress: [██░░░░░░░░░░] 17% (2 of 12 phases complete)
+Progress: [███░░░░░░░░░] 25% (3 of 12 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total phases completed: 2
-- Total plans completed: 7 (1 in Phase 1, 6 in Phase 2)
+- Total phases completed: 3
+- Total plans completed: 10 (1 in Phase 1, 6 in Phase 2 incl. hotfix, 3 in Phase 3)
 - Average duration: ~5 hours per phase
-- Total execution time: ~11 hours
+- Total execution time: ~16 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan | Notes |
 |-------|-------|-------|----------|-------|
 | 1 (Reel + gestures) | 1 | ~6h | ~6h | Single hand-coded plan; iPhone gesture polish |
-| 2 (Reel polish + perf) | 6 | ~5h | ~50min | Parallel agent dispatch via superpowers; one bug-chase iteration |
+| 2 (Reel polish + perf) | 6 | ~5h | ~50min | Parallel agent dispatch; one bug-chase iteration (lazy CSS) |
+| 3 (App shell) | 3 | ~5h | ~1h40 | Parallel wave 1 + solo wave 2; plan-checker caught 3 blockers pre-execution |
 
 **Recent Trend:**
-- Phase 2 plans averaged ~50min including parallel dispatch overhead
-- Per-plan velocity improved 7× when running parallel via worktrees vs sequential
-- One root-cause regression (lazy-import + library CSS race) cost ~1h to diagnose; feedback memory captured
+- Plan quality improved phase-over-phase (Phase 3's plan-checker round caught issues before code wrote them)
+- Side bug discovered during Phase 3 planning: amber tokens drifted from DESIGN.md — reconciled in 03-03 Task 1
+- Parallel dispatch via worktrees + agents continues to net ~3× wall-clock vs sequential
 
 *Updated after each phase completion*
 
@@ -44,31 +45,41 @@ Progress: [██░░░░░░░░░░] 17% (2 of 12 phases complete)
 
 Decisions are logged in `.planning/PROJECT.md` Key Decisions table. Recent decisions affecting current work:
 
-- **Phase 1**: Pure gesture state machine + effectful React hook split. Machine is testable in isolation; hook owns DOM/timer effects.
-- **Phase 1**: Window-level pointer listeners with `capture: true`. MapLibre's `setPointerCapture` swallows element-level pointer events — without window-level capture, MAP_INTERACT cannot return to IDLE.
-- **Phase 1**: `touch-action: none` (NOT `manipulation`) on `.reel-root`. iOS still claims pan rights with `manipulation`, breaking horizontal scrub.
-- **Phase 1**: Flick detection uses duration < 300ms gate, not velocity threshold. Spec literal — duration IS the velocity proxy.
-- **Phase 2**: MapTiler `streets-v2-dark` style URL with demotiles fallback when key absent. Sky/atmosphere not configured (and not needed — pitch 55-65 renders fine on this style).
-- **Phase 2**: LCP poster is a generic dark radial gradient (no JPEG asset). Scales to multi-user reels in Phase 9 — same poster regardless of which city the user's reel starts at.
-- **Phase 2**: MapLibre's CSS imported in `src/main.tsx` (eager bundle), not at the top of `MapCanvas.tsx` (lazy chunk). Avoids JS-runs-before-CSS race that broke MapLibre canvas sizing on chapter transitions.
-- **Phase 2**: `manualChunks: { maplibre: ['maplibre-gl'] }` in vite.config.ts. Maplibre-gl is a separate ~283 KB gzip chunk, lazily loaded on demand. Main bundle (post-Framer) is 103 KB gzip — well under PERF-02's 250 KB ceiling.
-- **Phase 2**: Vitest 4.x + `@vitest/coverage-v8`. State machine has 100% line + branch coverage (85 tests).
-- **Phase 2**: Framer Motion 11 currently bundled into the main chunk (not split via manualChunks). Optional follow-up if LCP scoring requires it.
+- **Phase 1**: Pure gesture state machine + effectful React hook split.
+- **Phase 1**: Window-level pointer listeners with `capture: true` (MapLibre's `setPointerCapture` swallows element-level events).
+- **Phase 1**: `touch-action: none` on `.reel-root`. Flick detection uses duration < 300ms gate, not velocity.
+- **Phase 2**: MapTiler `streets-v2-dark` style URL with demotiles fallback when key absent.
+- **Phase 2**: LCP poster is a generic dark radial gradient (no JPEG asset). Scales to multi-user reels in Phase 9.
+- **Phase 2**: MapLibre's CSS imported in `src/main.tsx` (eager bundle), not at the top of MapCanvas.tsx (lazy chunk). Avoids JS-runs-before-CSS race.
+- **Phase 2**: `manualChunks: { maplibre: ['maplibre-gl'] }`. Maplibre is a separate ~283 KB gzip chunk.
+- **Phase 2**: Vitest 4.x; 100% line + branch coverage on stateMachine.ts.
+- **Phase 3**: React Router v7 (unified `react-router` package, not `react-router-dom`). `createBrowserRouter` + `RouterProvider`.
+- **Phase 3**: `darkMode: 'media'` (Tailwind 3.4) — system preference, no manual toggle in v1. Manual toggle deferred to v2 (logged in `.planning/TODOS.md`).
+- **Phase 3**: Light-mode tokens via `@media (prefers-color-scheme: light)` direct overrides on `--color-*` (no semantic-alias layer like `--bg`/`--surface`/`--accent` — would have been dead config).
+- **Phase 3**: Public reel always dark (DESIGN.md:72). `--color-bg-map` is NOT overridden in light mode.
+- **Phase 3**: `RequireAuth` is a 13-line pass-through stub for now. Phase 4 edits this file to add Auth0 — clean seam, no restructure needed.
+- **Phase 3**: BottomNav text-only (Reel | Trips | Me); no icon library installed.
+- **Phase 3**: `/app/` Reel ↔ BottomNav z-index collision solved via `.app-reel-host` wrapper + scoped CSS rule (`!important` required because ChapterRail uses inline `bottom` style).
+- **Phase 3**: Amber tokens reconciled to DESIGN.md (`#FFE4A0` / `#FFD470` / `#E8B040`) in both `index.css` and `tailwind.config.ts` — pre-existing drift surfaced during planning.
 
 ### Pending Todos
 
 [From `.planning/todos/pending/` — ideas captured during sessions]
 
-- **Lighthouse mobile audit** on `bun run preview` — verify LCP element is `<div>` (the new MapPoster radial gradient), perf score ≥ 90, CLS ≤ 0.1. Deferred human-verify checkpoint from 02-02. Not blocking Phase 3.
-- **Optional: split framer-motion into its own chunk** in vite.config.ts manualChunks. Currently Framer is bundled into the main chunk (~37 KB gzip of the main bundle). Splitting it would shrink the LCP-blocking bundle further.
-- **Visual review**: subjective Apple-Weather-pace check on Framer staggered choreography + tuned 1.6/1800ms flyTo. Deferred from 02-03.
+- **Lighthouse mobile audit** on `bun run preview` — verify LCP element, perf score ≥ 90, CLS ≤ 0.1. Phase 2 deferred check.
+- **Optional: split framer-motion into its own chunk** in vite.config.ts manualChunks. Phase 2 follow-up.
+- **Visual review of Phase 3 routes on iPhone:** `/`, `/u/foo`, `/app/`, `/app/trips`, `/app/me`, light/dark mode toggle via OS settings.
+- **Visual review of Phase 2 motion** (Apple-Weather-pace check on Framer choreography + tuned flyTo).
+- **Manual theme toggle in v2** (logged in `.planning/TODOS.md` by 03-03).
+- **Future refactor (Phase 9):** extract `<ReelView />` shared between PublicReelRoute / HandleReelRoute / AppReelRoute — currently each branches `usePrefersReducedMotion()` independently.
 
 ### Blockers/Concerns
 
 [Issues that affect future work]
 
-- **Phase 4 prereq**: Auth0 tenant config — confirm existing personal tenant has a new application registered for this project; `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_AUDIENCE` env vars needed.
-- **Phase 8 prereq**: OCI Ampere A1 VM provisioning — confirm 2 OCPU / 8 GB sizing before W8 starts; resize or add worker VM if not.
+- **Phase 4 prereq**: Auth0 tenant config — confirm existing personal tenant has a new application registered for this project; need `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_AUDIENCE` env vars. Cannot execute plan 04-02 without this.
+- **Phase 4 prereq**: Docker installed and running locally — Postgres 16 in Docker for plan 04-01.
+- **Phase 8 prereq**: OCI Ampere A1 VM provisioning — confirm 2 OCPU / 8 GB sizing.
 - **Phase 8 prereq**: DNS for `timeline.bryanlam.dev` not yet pointed.
 
 ## Deferred Items
@@ -89,22 +100,29 @@ Items acknowledged and carried forward:
 | Optimistic locking | Concurrent write detection | v2 | Phase 1 (planning) |
 | Photo gallery | Dedicated per-city gallery view | v2 | Phase 1 (planning) |
 | Per-reel poster generation | Server-side first-frame render at save time | Phase 9+ | Phase 2 (post-mortem) |
+| Manual theme toggle | UI control to override `prefers-color-scheme` | v2 | Phase 3 (03-03 planning) |
 
 ## Session Continuity
 
-Last session: 2026-04-30
-Stopped at: Phase 2 fully shipped. `main` at `7af6586` (origin synced). 6 plans landed: 02-01 (MapTiler), 02-02 (originally LCP+lazy, then patched in 02-07), 02-03 (Framer + flyTo tune), 02-04 (Vitest + 85 tests), 02-05 (StateBadge prod-gate), 02-07 (lazy CSS hoist + generic poster + setSky revert). Map renders correctly on iPhone Safari and Chrome desktop across all 10 chapter transitions. PERF requirements satisfied via main bundle 103 KB gzip + 283 KB maplibre chunk.
+Last session: 2026-05-06
+Stopped at: Phase 3 fully shipped. `main` at `e7fb632` (origin synced). Three plans landed: 03-01 (router), 03-02 (nav + auth seam + collision), 03-03 (theme + amber). All wave 1 + 2 worktrees cleaned up. App still builds and ships at every commit. 85/85 tests preserved through phase. No backend yet (Phase 4).
 
-**Next action**: Plan Phase 3 (App shell). Run `/gsd-plan-phase 3` to generate PLAN.md files. Phase 3 goal per ROADMAP.md: React Router v7 install, bottom nav + private/public route guards, light/dark theme tokens. Estimate 3-5 plans. After planning, the same parallel-worktree dispatch pattern from Phase 2 applies.
+**Next action**: Plan Phase 4 (Backend skeleton + Auth0 wiring). 2 plans pre-named in ROADMAP:
+- 04-01: Backend skeleton (Hono + Drizzle + migrations + health + Postgres in Docker, no auth)
+- 04-02: Auth0 wiring (Universal Login, JWT middleware, lazy provisioning, handle picker UI)
+
+Plan 04-02 covers AUTH-05/06/07 (handle pattern, reserved words, picker prompt) in addition to AUTH-01-04 listed in ROADMAP — the handle picker UI line implies these. Worth flagging during planning.
+
+After planning, plan 04-01 can execute immediately (Docker required); plan 04-02 blocks on user creating an Auth0 application and pasting the env vars into `.env.local`.
 
 ## Notable Artifacts
 
 - **Source-of-truth gstack docs** at `~/.gstack/projects/usbryanchlam-timeline-revamp/bryanlam-main-design-20260423-104825.md` (master plan) and `bryanlam-main-eng-review-test-plan-20260424-200544.md` (QA plan). Repo copies in `docs/plan.md` and `docs/test-plan.md` are snapshots; gstack remains primary.
-- **Design system** at `DESIGN.md` (repo root) — read before any UI change.
-- **v2 backlog** at `TODOS.md` (repo root) — explicit cuts that should not creep back.
-- **Codebase map** at `.planning/codebase/` — STACK, INTEGRATIONS, ARCHITECTURE, STRUCTURE, CONVENTIONS, TESTING, CONCERNS. Refresh planned at end of W4, W6, W9.
-- **MapTiler API key** in `.env.local` (gitignored); also in any active `.worktrees/*/`. Free tier 100k req/mo.
-- **Phase 2 lessons saved to memory**: post-merge `bun install` discipline; library-CSS-out-of-lazy-chunks pattern.
+- **Design system** at `DESIGN.md` (repo root) — read before any UI change. Amber tokens at `DESIGN.md:85-87`; "public reel always dark" lock at `DESIGN.md:72`.
+- **v2 backlog** at `TODOS.md` (repo root) and `.planning/TODOS.md` (Phase-3-internal toggles).
+- **Codebase map** at `.planning/codebase/` — STACK, INTEGRATIONS, ARCHITECTURE, STRUCTURE, CONVENTIONS, TESTING, CONCERNS. **Refresh recommended** at end of Phase 4 (backend introduces a whole new area not in current map).
+- **MapTiler API key** in `.env.local` (gitignored); Auth0 env vars NOT YET added (needed for Phase 4 04-02).
+- **Phase memory feedback** saved to `~/.claude/projects/-Users-bryanlam-Workspaces-timeline-revamp/memory/`: post-merge `bun install`, hoist library CSS out of lazy chunks.
 
 ---
-*Last updated: 2026-04-30 after Phase 2 closure (commit `7af6586`).*
+*Last updated: 2026-05-06 after Phase 3 closure (commit `e7fb632`).*
