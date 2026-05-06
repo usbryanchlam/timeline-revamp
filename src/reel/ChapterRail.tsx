@@ -27,6 +27,7 @@ export function ChapterRail({ total, currentIndex, scrubT }: Props) {
 
   return (
     <div
+      data-chapter-rail
       className="pointer-events-none absolute z-20 flex gap-1"
       style={{
         left: '24px',
