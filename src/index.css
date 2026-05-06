@@ -10,9 +10,9 @@
     --color-ink: #f7f8fb;
     --color-ink-dim: #a8b0c2;
     --color-ink-mute: #6b7488;
-    --color-amber-400: #ffd470;
-    --color-amber-500: #f5b83a;
-    --color-amber-600: #c28a1e;
+    --color-amber-400: #ffe4a0;
+    --color-amber-500: #ffd470;
+    --color-amber-600: #e8b040;
     --color-line: #1b2235;
 
     --ease-camera: cubic-bezier(0.22, 1, 0.36, 1);
@@ -27,7 +27,27 @@
     --dur-flyto: 1400ms;
     --dur-pulse: 720ms;
 
-    color-scheme: dark;
+    color-scheme: light dark;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      /* Chrome-only overrides. Reel canvas (--color-bg-map) and reel scrims
+         intentionally NOT overridden — public reel is always dark per
+         DESIGN.md:72. */
+      --color-bg: #f4f5f7;          /* DESIGN.md neutral-50: light bg */
+      --color-bg-elev: #ffffff;     /* DESIGN.md neutral-0: light surface */
+      --color-ink: #0a0e1a;         /* DESIGN.md neutral-950: light text-primary */
+      --color-ink-dim: #374151;     /* DESIGN.md neutral-700: light text-secondary */
+      --color-ink-mute: #9ca3af;    /* DESIGN.md neutral-400: light muted */
+      --color-line: #e5e7eb;        /* DESIGN.md neutral-100: light border */
+      /* --color-bg-map intentionally NOT overridden — reel stays dark per DESIGN.md:72 */
+      /* --color-amber-{400,500,600} intentionally NOT overridden — accent is a brand
+         color, not a theme color. Amber-500 (#FFD470) reads on both bg colors;
+         components that need a darker amber for AA contrast on white can use
+         amber-600 (#E8B040) directly. */
+      color-scheme: light;
+    }
   }
 
   html,
@@ -75,6 +95,7 @@
     border: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
   }
 
+  /* Reel surface — always dark per DESIGN.md:72. Do not theme. */
   .scrim-bottom {
     background: linear-gradient(
       to top,
@@ -84,6 +105,7 @@
     );
   }
 
+  /* Reel surface — always dark per DESIGN.md:72. Do not theme. */
   .scrim-top {
     background: linear-gradient(
       to bottom,

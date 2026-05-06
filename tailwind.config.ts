@@ -3,6 +3,7 @@ import containerQueries from '@tailwindcss/container-queries';
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: 'media',
   theme: {
     extend: {
       fontFamily: {
@@ -21,9 +22,9 @@ export default {
           mute: '#6B7488',
         },
         amber: {
-          400: '#FFD470',
-          500: '#F5B83A',
-          600: '#C28A1E',
+          400: '#FFE4A0',
+          500: '#FFD470',
+          600: '#E8B040',
         },
         line: '#1B2235',
       },
