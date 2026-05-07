@@ -16,6 +16,9 @@ out/
 .env.*.local
 !.env.example
 
+# Postgres data (if ever bind-mounted; named volume `pgdata` is Docker-managed)
+pgdata/
+
 # Editor / OS
 .DS_Store
 .vscode/
