@@ -1,7 +1,7 @@
 # Codebase Structure
 
 **Analysis Date:** 2026-04-27
-**Phase:** W1
+**Phase:** W4 — backend skeleton landed (04-01)
 
 ## Directory Layout
 
@@ -22,13 +22,27 @@ timeline-revamp/
 │   ├── main.tsx             #   ReactDOM.createRoot + StrictMode
 │   ├── index.css            #   Tailwind base + tokens + components + utilities
 │   └── vite-env.d.ts        #   /// <reference types="vite/client" />
+├── server/                  # Hono API (lands W4)
+│   ├── db/
+│   │   ├── schema.ts        #   Drizzle pg-core: users, cities, photos, notifications (DATA-02 constraint owned by 0001 migration, NOT this file)
+│   │   ├── client.ts        #   Shared Drizzle client (one Pool per process)
+│   │   ├── migrate.ts       #   bun run db:migrate entrypoint
+│   │   └── migrations/      #   0000_*.sql auto-generated; 0001_cities_deferrable_unique.sql hand-authored (DATA-02)
+│   ├── env.ts               #   Zod-validated server env
+│   └── index.ts             #   Hono app: GET /health, GET /api/health (more in 04-02)
+├── scripts/
+│   └── dev.ts               #   Spawns Vite + Hono with prefixed output and signal forwarding
 ├── index.html               # Single HTML entry, Google Fonts preconnect
-├── package.json             # Scripts: dev, build, preview, typecheck
+├── package.json             # Scripts: dev, dev:web, dev:api, build, typecheck, db:up, db:down, db:generate, db:migrate
 ├── bun.lock                 # bun lockfile, committed
-├── tsconfig.json            # Project references → app + node
+├── docker-compose.yml       # Postgres 16 service (named volume `pgdata`)
+├── drizzle.config.ts        # Drizzle Kit config (schema path + dbCredentials)
+├── tsconfig.json            # Project references → app + node + server
 ├── tsconfig.app.json        # Strict TS for src/, @/ alias
 ├── tsconfig.node.json       # Strict TS for vite.config.ts
-├── vite.config.ts           # @vitejs/plugin-react + @/ alias + host:true dev server
+├── tsconfig.server.json     # Strict TS for server/ (NodeNext module resolution)
+├── .env.example             # Documented env contract; .env.local stays gitignored
+├── vite.config.ts           # @vitejs/plugin-react + @/ alias + host:true dev server + /api proxy → :8787
 ├── tailwind.config.ts       # Theme extension (colors, fonts, easings, container-queries plugin)
 ├── postcss.config.js        # tailwindcss + autoprefixer
 ├── DESIGN.md                # Visual / UX design system (CLAUDE.md routes here before UI changes)
@@ -92,12 +106,13 @@ timeline-revamp/
 | A new visual token | `src/index.css` `:root` (CSS var) AND `tailwind.config.ts` `theme.extend` if utility-needed |
 | Static demo data | `src/data/<topic>.ts`, with strict types from `@/types` |
 | A new page (W3+) | `src/routes/<route>.tsx`, register in router (lands W3) |
-| Backend code (W4+) | New top-level `server/` or `apps/api/` directory — TBD when W4 starts |
+| Backend route or endpoint | `server/<feature>.ts` (or grow `server/index.ts` for tiny additions); register on the Hono app |
+| New DB table or schema change | edit `server/db/schema.ts`, run `bun run db:generate`, review SQL, run `bun run db:migrate`. Do NOT touch `server/db/migrations/0001_cities_deferrable_unique.sql`; it is owned by DATA-02. |
 
 ## File Count
 
 ```
-Source files (.ts/.tsx):  17
-Config files:             8 (package.json, tsconfig*, vite.config, tailwind.config, postcss.config, index.html, .gitignore)
+Source files (.ts/.tsx):  ~22 (frontend ~17 + server: env.ts, schema.ts, client.ts, migrate.ts, index.ts) + scripts/dev.ts
+Config files:             10 (package.json, tsconfig* x4, vite.config, drizzle.config, tailwind.config, postcss.config, docker-compose, index.html, .gitignore)
 Doc files:                6 (DESIGN.md, TODOS.md, README.md, CLAUDE.md, docs/plan.md, docs/test-plan.md)
 ```

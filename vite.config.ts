@@ -12,6 +12,16 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    proxy: {
+      // All /api/* requests from the frontend in dev are proxied to the Hono
+      // process started by scripts/dev.ts. Production (Phase 8) replicates
+      // this with Nginx. Frontend code never needs to know the API host —
+      // always fetch('/api/...').
+      '/api': {
+        target: 'http://localhost:8787',
+        changeOrigin: false,
+      },
+    },
   },
   build: {
     rollupOptions: {
