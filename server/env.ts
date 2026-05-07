@@ -1,5 +1,11 @@
-import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
 import { z } from 'zod';
+
+// Load .env.local first (per-developer secrets, gitignored), then fall
+// back to .env (committed defaults if any). Variables already in
+// process.env are NOT overwritten — Docker / CI env wins.
+loadDotenv({ path: '.env.local' });
+loadDotenv({ path: '.env' });
 
 // Server env contract. Loaded once at process start; throws synchronously
 // if DATABASE_URL is missing so we fail fast instead of crashing on first query.
