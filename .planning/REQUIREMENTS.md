@@ -149,7 +149,7 @@ Mapping of requirements to roadmap phases. Updated as `ROADMAP.md` evolves.
 | PERF-01..05 | Phase 2 (W2) | Pending |
 | APP-01..03 | Phase 3 (W3) | Pending |
 | AUTH-01..04 | Phase 4 (W4) | Pending |
-| AUTH-05..07 | Phase 7 (W7) | Pending |
+| AUTH-05..07 | Phase 4 (W4) | Pending |
 | DATA-01..03 | Phase 4 (W4) | Pending |
 | DATA-04 | Phase 5 (W5) | Pending |
 | DATA-05..07 | Phase 6 (W6) | Pending |
