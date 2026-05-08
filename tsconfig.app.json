@@ -20,7 +20,8 @@
     "types": ["vitest/globals"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@server/*": ["server/*"]
     }
   },
   "include": ["src"]

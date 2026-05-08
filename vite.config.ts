@@ -7,6 +7,13 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, 'src'),
+      // Narrow door for the frontend to import the SHARED handle
+      // validator + reserved-words list from server/. Frontend code
+      // MUST NOT import anything else from server/ (no DB code, no
+      // env, no auth middleware) — those would either crash at build
+      // time (Node-only modules) or leak server contracts into the
+      // bundle. Only @server/handles/* is safe.
+      '@server': path.resolve(import.meta.dirname, 'server'),
     },
   },
   server: {
