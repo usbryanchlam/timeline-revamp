@@ -13,6 +13,11 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   PORT: z.coerce.number().int().positive().default(8787),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  // Auth0 — wired in plan 04-02. AUTH0_DOMAIN is a bare hostname (e.g.,
+  // bryanlam.us.auth0.com), NOT a URL — the JWT middleware constructs
+  // `https://${AUTH0_DOMAIN}/` for the issuer claim and the JWKS URL.
+  AUTH0_DOMAIN: z.string().min(1),
+  AUTH0_AUDIENCE: z.string().url(),
 });
 
 const parsed = envSchema.safeParse(process.env);
