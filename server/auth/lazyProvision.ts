@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
 import { eq } from 'drizzle-orm';
-import { db } from '@server/db/client.js';
-import { users, type User } from '@server/db/schema.js';
+import { db } from '../db/client.js';
+import { users, type User } from '../db/schema.js';
 
 // AUTH-03: lazy user provisioning. Runs on every authenticated /api/me
 // call (mounted in server/index.ts AFTER requireJwt — order matters

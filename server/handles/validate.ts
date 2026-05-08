@@ -1,4 +1,4 @@
-import { RESERVED_HANDLES } from '@server/handles/reservedWords.js';
+import { RESERVED_HANDLES } from './reservedWords.js';
 
 // AUTH-05: handles match [a-z0-9-]{3,20}, lowercase-enforced.
 // The pattern is anchored — empty string and overlong inputs fail.

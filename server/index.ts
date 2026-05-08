@@ -2,21 +2,36 @@ import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { serve } from '@hono/node-server';
 import { env } from './env.js';
+import { requireJwt } from './auth/jwt.js';
+import { lazyProvisionUser } from './auth/lazyProvision.js';
+import { meRouter } from './routes/me.js';
+// Side-effect import: registers the Hono ContextVariableMap
+// augmentation so c.set('user', row) is typed as User (not unknown)
+// across this process. Removing this import would silently relax
+// types across every authenticated handler.
+import './auth/context.js';
 
 export const app = new Hono();
 
 app.use('*', logger());
 
-// Health endpoint. Intentionally does NOT touch the database — a healthy
-// process with a dead DB still answers 200 here, which is what we want
-// for diagnosing "is the API up at all?". Phase 9 (DEPLOY-06) adds a
-// separate /readyz that DOES check DB.
+// PUBLIC — no auth. /health is for direct API probes (deploy
+// healthchecks); /api/health is for the proxied path so the frontend
+// can probe end-to-end through the Vite dev proxy.
 app.get('/health', (c) => c.json({ status: 'ok' }));
-
-// Mirror at /api/health so the Vite proxy can be tested end-to-end from
-// the frontend during dev. /health is for direct API probes (deploy
-// healthchecks); /api/health is for the proxied path.
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
+
+// AUTHENTICATED — JWT validation, then lazy provisioning, then routes.
+// Order matters: requireJwt MUST run before lazyProvisionUser because
+// the latter reads c.var.auth0Sub set by the former.
+//
+// Hono path matching: the first form (exact) covers GET /api/me; the
+// second (prefix) covers POST /api/me/handle and any future
+// /api/me/<sub-path>. Both are needed — listing only the wildcard
+// would skip middleware for the bare /api/me path.
+app.use('/api/me', requireJwt, lazyProvisionUser);
+app.use('/api/me/*', requireJwt, lazyProvisionUser);
+app.route('/api/me', meRouter);
 
 serve(
   { fetch: app.fetch, port: env.PORT },

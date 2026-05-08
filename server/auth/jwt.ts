@@ -1,6 +1,6 @@
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import type { Context, MiddlewareHandler } from 'hono';
-import { env } from '@server/env.js';
+import { env } from '../env.js';
 
 // AUTH-02: JWT validation middleware. Validates RS256 JWTs against
 // Auth0's JWKS endpoint using `jose`. Locked to:

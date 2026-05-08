@@ -1,4 +1,4 @@
-import type { User } from '@server/db/schema.js';
+import type { User } from '../db/schema.js';
 
 // Hono context type extension. The c.var bag is keyed by string at
 // runtime; this declaration teaches TypeScript that anything that
