@@ -34,8 +34,9 @@ describe('BigDataCloud architectural guard', () => {
 
     const offenders: string[] = [];
     for (const f of files) {
-      // Exclude this test file itself (it mentions the word in its assertion message)
-      if (f.endsWith('__no-bigdatacloud.test.ts')) continue;
+      // Skip any meta-test file (leading `__`) — they may legitimately mention the guarded string
+      // in their assertion messages.
+      if (path.basename(f).startsWith('__')) continue;
       const contents = readFileSync(f, 'utf8').toLowerCase();
       if (contents.includes('bigdatacloud')) {
         offenders.push(path.relative(serverRoot, f));

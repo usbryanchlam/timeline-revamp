@@ -23,16 +23,21 @@ export function TripsRoute() {
   const { data: cities, error, refetch } = useCitiesQuery();
   const [draftPin, setDraftPin] = useState<DraftPin | null>(null);
   const [geocoded, setGeocoded] = useState<GeocodeResult | null>(null);
+  const [lookupPending, setLookupPending] = useState(false);
 
   const handlePick = useCallback((lat: number, lng: number) => {
     setDraftPin({ lat, lng });
     setGeocoded(null); // clear stale lookup before the new one resolves
-    void reverseGeocode(lat, lng).then((res) => setGeocoded(res));
+    setLookupPending(true);
+    void reverseGeocode(lat, lng)
+      .then((res) => setGeocoded(res))
+      .finally(() => setLookupPending(false));
   }, []);
 
   const closePanel = useCallback(() => {
     setDraftPin(null);
     setGeocoded(null);
+    setLookupPending(false);
   }, []);
 
   const isLoading = cities === undefined && !error;
@@ -40,18 +45,30 @@ export function TripsRoute() {
 
   return (
     <main className="h-[calc(100dvh-4rem)] flex flex-col">
-      <div className="h-1/2 relative">
-        <MapPicker
-          cities={cities ?? []}
-          draftPin={draftPin}
-          onPick={handlePick}
+      {cities !== undefined ? (
+        <div className="h-1/2 relative">
+          <MapPicker
+            cities={cities}
+            draftPin={draftPin}
+            onPick={handlePick}
+          />
+          {empty && (
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 mx-auto w-max max-w-[90%] glass-pill px-4 py-3 rounded-full text-ink text-sm pointer-events-none">
+              Drop a pin on the map to start your reel
+            </div>
+          )}
+        </div>
+      ) : (
+        // Placeholder reserves the map area while cities load — prevents
+        // layout shift on resolve and avoids mounting MapPicker with [] (which
+        // would lock its lazy-init snapshot to an empty city set; see plan
+        // 05-02 for the proper re-init fix).
+        <div
+          className="h-1/2 bg-bg-elev animate-pulse"
+          aria-label="Loading map"
+          aria-busy="true"
         />
-        {empty && (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 mx-auto w-max max-w-[90%] glass-pill px-4 py-3 rounded-full text-ink text-sm pointer-events-none">
-            Drop a pin on the map to start your reel
-          </div>
-        )}
-      </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4">
         {error && (
@@ -96,6 +113,7 @@ export function TripsRoute() {
         <DraftPinPanel
           pin={draftPin}
           prefill={geocoded}
+          lookupPending={lookupPending}
           onClose={closePanel}
         />
       )}
@@ -126,11 +144,11 @@ function CityCard({ city }: { readonly city: CityDTO }) {
 interface DraftPinPanelProps {
   readonly pin: DraftPin;
   readonly prefill: GeocodeResult | null;
+  readonly lookupPending: boolean;
   readonly onClose: () => void;
 }
 
-function DraftPinPanel({ pin, prefill, onClose }: DraftPinPanelProps) {
-  const lookupPending = prefill === null;
+function DraftPinPanel({ pin, prefill, lookupPending, onClose }: DraftPinPanelProps) {
   return (
     <div
       role="dialog"
