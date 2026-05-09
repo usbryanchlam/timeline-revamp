@@ -203,4 +203,12 @@ describe('GET /api/cities (05-01 task 1)', () => {
     });
     expect(res.status).toBe(404);
   });
+
+  it('returns 404 on GET /:id when the id is a malformed UUID', async () => {
+    const token = await mint({ sub: SUB_A, email: EMAIL_A });
+    const res = await buildApp().request('/api/cities/not-a-uuid', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(404);
+  });
 });
