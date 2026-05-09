@@ -1,94 +1,94 @@
 # Testing Patterns
 
 **Analysis Date:** 2026-04-27
-**Phase:** W1
+**Phase:** Post-Phase 4 (Vitest live; 88 tests across frontend + server)
 
-## Status
+## Test Framework
 
-**Automated tests: none yet.** First tests land in W2.
+**Runner:** Vitest 4.1.5 (`devDependencies` in `package.json:52`).
+**Coverage:** `@vitest/coverage-v8` 4.1.5 — v8 provider (`vitest.config.ts:20`).
+**Config:** `/Users/bryanlam/Workspaces/timeline-revamp/vitest.config.ts` — Node environment, globals on, single suite spans both `src/**` and `server/**`.
 
-The W1 acceptance gate is a manual one: 30-second test on a real iPhone (iOS 17+ Safari) with all gesture transitions verified. The `StateBadge` dev affordance (top-left amber pill) shows the current `ReelStateName` and is the harness for that verification.
-
-## Planned Test Stack (locked in docs/plan.md)
-
-**Test runners:**
-- **Vitest** (latest) — unit tests + integration tests. Hot-reload friendly with Vite, no jsdom config drama.
-- **Playwright** (latest) — E2E tests on real Chromium / WebKit / Firefox. Mobile emulation profile for iPhone 14 Pro.
-- **@testing-library/react** — component testing.
-
-**Coverage target:** 80% lines, 80% branches (gstack-global rule from `~/.claude/rules/common/testing.md`).
-
-## What to Test First (W2)
-
-**Pure modules — Vitest unit tests:**
-1. `stateMachine.ts` — every `(state, event) → state` transition. Especially:
-   - SCRUBBING → IDLE on POINTER_UP commits the right chapter index.
-   - POINTER_DOWN with pointers≥2 always promotes to MAP_INTERACT regardless of prior state.
-   - VIS_HIDDEN never returns to anything other than SUSPENDED.
-   - VIS_VISIBLE → IDLE only from SUSPENDED.
-   - JUMP_CHAPTER clamps at 0 and totalChapters - 1.
-   - TAP_BACKGROUND only toggles in IDLE / PAUSED, ignores other states.
-
-**React hooks — RTL `renderHook`:**
-2. `useGestureMachine` —
-   - Long-press timer fires SCRUBBING after 200ms with single finger held still.
-   - Long-press CANCELLED if user moves >FLICK_THRESHOLD_PX vertically before 200ms.
-   - Visibility change dispatches VIS_HIDDEN/VISIBLE.
-   - Auto-play timer in IDLE wraps from last chapter back to first.
-3. `usePrefersReducedMotion` — subscribes to matchMedia change, returns latest.
-
-**Components — RTL:**
-4. `ChapterRail` — current segment fills amber, scrub cursor draws partial gradient at right offset.
-5. `ChapterOverlay` — re-mounts on key change (verifies arrival pulse path).
-6. `ReducedMotionReel` — renders all 10 chapters in order, has CTA link.
-
-**E2E — Playwright (mobile profile):**
-7. Public reel landing — auto-play advances at least 2 chapters in 12 seconds.
-8. Reduced-motion path — no map canvas, all chapters visible by scroll.
-9. Keyboard — Space pauses, ArrowRight advances chapter.
-
-## Test File Organization (planned)
-
-**Location:**
-- Unit/component tests live next to source: `src/gestures/stateMachine.test.ts`.
-- Playwright lives in `tests/e2e/` at repo root.
-
-**Naming:**
-- `.test.ts` for Vitest (matches Vitest defaults).
-- `.spec.ts` for Playwright (Playwright defaults).
-
-## Manual Test Plan
-
-The full QA plan lives in `docs/test-plan.md`. Notable areas the automated suite cannot fully cover:
-
-- **Real-device gesture feel** — long-press timing, flick threshold, scrub cursor responsiveness on actual touch hardware. iPhone 14 Pro is the canonical reference device.
-- **iOS Safari quirks** — pull-to-refresh disabled, back-edge-swipe not intercepted, 3-finger gestures yield to OS, MediaRecorder behavior in W10.
-- **Map flyTo aesthetic** — does the camera land where the eye expects, with the right pitch/bearing? Subjective.
-
-## Run Commands (when wired)
+## Run Commands
 
 ```bash
-bun test                     # Vitest, all unit + integration
-bun test --watch             # watch mode
-bun test stateMachine        # filter by name substring
-bun run test:coverage        # coverage report
-bun run test:e2e             # Playwright, headless
-bun run test:e2e --headed    # Playwright with visible browser
+bun run test            # vitest run — single pass, what CI uses
+bun run test:watch      # vitest — watch mode
+bun run test:coverage   # vitest run --coverage — v8 lcov + text report
 ```
 
-## Smoke Tests Today
+**CRITICAL: use `bun run test`, NOT `bun test`.** Bare `bun test` invokes Bun's native test runner which (a) doesn't load `vitest.config.ts` and therefore doesn't resolve the `@/` alias, and (b) doesn't recognize Vitest's `describe`/`it`/`expect` globals from the `vitest/globals` types. Always go through the npm script so `vitest` runs.
 
-The closest thing to a test gate in W1:
+## Test Inventory (88 total)
 
-```bash
-bun run typecheck   # tsc -b --noEmit must be clean
-bun run build       # tsc -b && vite build must succeed
+| File                                          | Count | Coverage Target                               |
+|-----------------------------------------------|-------|-----------------------------------------------|
+| `src/gestures/stateMachine.test.ts`           | 85    | `stateMachine.ts` — 100% line + branch        |
+| `server/auth/jwt.test.ts`                     |  3    | `requireJwt` middleware — AUTH-02 SC #4 gate  |
+
+No e2e tests (no Playwright yet). No integration tests against Postgres yet. No React component tests (no jsdom/RTL configured — Vitest env is `node`).
+
+## Test File Organization
+
+- **Co-located with source:** `src/gestures/stateMachine.test.ts` sits beside `stateMachine.ts`; `server/auth/jwt.test.ts` sits beside `jwt.ts`.
+- **Naming:** `<module>.test.ts` matches Vitest's default include and the `vitest.config.ts` patterns (`src/**/*.test.ts`, `src/**/*.test.tsx`, `server/**/*.test.ts`).
+- **Coverage scope** (`vitest.config.ts:21-29`): includes `src/**/*.{ts,tsx}` and `server/**/*.ts`; excludes test files, `src/main.tsx` (entrypoint), `src/vite-env.d.ts`, and `src/data/**` (pure data tables).
+
+## Patterns
+
+### Pure-function unit tests (`stateMachine.test.ts`)
+
+The state machine is a pure `(state, event, totalChapters) => state` function, so tests call it directly — no mocks, no setup. A `withState(overrides)` helper merges partial state over `initialState(TOTAL)` (`stateMachine.test.ts:10-12`):
+
+```typescript
+function withState(overrides: Partial<ReelState>): ReelState {
+  return { ...initialState(TOTAL), ...overrides };
+}
 ```
 
-Both run on every commit (no CI yet — first CI lands W9).
+Suites are organized by event type (`describe('VIS_HIDDEN', ...)`, etc.), with one `it` per source/target state pair. This is what gets to 100% line + branch coverage on `stateMachine.ts` — every transition has a dedicated assertion.
 
-## Anti-patterns to Avoid
+### Middleware tests with in-memory JWKS (`server/auth/jwt.test.ts`)
 
-- **Mocking the gesture state machine.** It's a pure function — call it directly. The whole point of the pure-machine + effectful-hook split is that the machine is trivially unit-testable without mocks.
-- **Mocking MapLibre in component tests.** Test the gesture hook and overlays separately; let Playwright cover the map+canvas integration on a real WebGL context.
-- **Testing `prefers-reduced-motion` via JSDOM.** JSDOM doesn't implement matchMedia faithfully. Test the picker logic with a hand-rolled fake MediaQueryList; test the actual fallback rendering with Playwright's `forcedColors` / `reducedMotion` emulation.
+The JWT middleware test mints real RS256 tokens against an in-memory keypair using `jose` — no live Auth0 tenant needed:
+
+1. Set `process.env.{DATABASE_URL,AUTH0_DOMAIN,AUTH0_AUDIENCE}` BEFORE the dynamic import of `./jwt.js` (`jwt.test.ts:16-18`). Reason: `server/env.ts` validates synchronously at import time and calls `process.exit(1)` on failure — top-level static imports would race the env setup and kill the runner.
+2. `beforeAll` generates an RS256 keypair with `jose.generateKeyPair`, exports the public half as a JWK with a fixed `kid`, and installs it via `__setJwksGetterForTest(createLocalJWKSet({ keys: [jwk] }))` (`jwt.test.ts:28-40`).
+3. Each test uses a `mint(opts)` helper around `jose.SignJWT` to produce expired / wrong-audience / valid tokens, then exercises a fresh Hono app with `app.request('/me', { headers: { authorization: ... } })`.
+
+Three assertions cover the AUTH-02 SC #4 gate: expired → 401, wrong audience → 401, valid → 200 with `c.var.auth0Sub` set.
+
+**Why it's structured this way:**
+- `__setJwksGetterForTest` is exported with a `__` prefix so it's visually flagged as test-only (`server/auth/jwt.ts:32`).
+- The `localGetter as never` cast (`jwt.test.ts:39`) bridges `createLocalJWKSet` and `createRemoteJWKSet` getter types — runtime shape is identical, only the named type differs.
+- Hono's built-in `app.request(...)` lets us run middleware against synthetic Requests without a server socket.
+
+## Mocking Philosophy
+
+- **Don't mock pure functions.** The state machine has no mocks anywhere — it's just called.
+- **Don't mock at the network layer when you can swap a dependency.** `jwt.test.ts` swaps the JWKS getter, not `fetch`.
+- **No MapLibre or React component mocks** — there are no component tests yet; when they land, RTL + a real DOM env (jsdom or happy-dom) will be required.
+
+## Coverage
+
+Run `bun run test:coverage`. Reports go to stdout (text) and `coverage/` (lcov + html). Current state machine coverage is 100% line + branch by design — every transition is asserted. JWT middleware coverage is partial (the three SC #4 paths) — the missing-bearer and missing-sub branches are not yet asserted but are easy adds.
+
+The 80% project-wide target from `~/.claude/rules/common/testing.md` is not met overall (most of `src/**` and `server/**` is uncovered) — that's intentional for now, with component tests and Postgres integration tests gated on later phases.
+
+## Anti-Patterns to Avoid
+
+- **`bun test` instead of `bun run test`** — Bun's native runner doesn't resolve `@/` and ignores `vitest.config.ts`.
+- **Top-level static `import` of `./jwt.js` in `jwt.test.ts`** — env validation will run before the test sets env vars and the runner dies. Use the `await import(...)` pattern.
+- **Mocking the gesture state machine.** It's pure — call it directly.
+- **Hitting real Auth0 in unit tests.** Use the in-memory JWKS pattern.
+- **JSDOM for `prefers-reduced-motion`.** JSDOM's matchMedia is a stub; reach for Playwright `reducedMotion` emulation when component tests land.
+
+## Planned Additions (not yet wired)
+
+- React Testing Library for `ChapterRail`, `ChapterOverlay`, `ReducedMotionReel` (requires switching `vitest.config.ts:12` env to `jsdom` or per-file `// @vitest-environment jsdom`).
+- Postgres integration tests using a Drizzle schema migration against a disposable Docker pg container.
+- Playwright E2E for the public reel auto-play, reduced-motion fallback, and keyboard controls.
+
+---
+
+*Testing refreshed: 2026-04-27*

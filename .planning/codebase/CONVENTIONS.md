@@ -1,120 +1,122 @@
 # Coding Conventions
 
 **Analysis Date:** 2026-04-27
-**Phase:** W1
+**Phase:** Post-Phase 4 (Vitest live, jose JWT validation tested)
 
 ## Naming Patterns
 
 **Files:**
-- React components: `PascalCase.tsx` (e.g., `ChapterOverlay.tsx`, `MapCanvas.tsx`).
-- Hooks: `useCamelCase.ts` (e.g., `useGestureMachine.ts`, `usePrefersReducedMotion.ts`).
-- Pure modules: `camelCase.ts` (e.g., `stateMachine.ts`).
+- React components: `PascalCase.tsx` (e.g., `ChapterOverlay.tsx`, `MapCanvas.tsx`, `HandlePickerModal.tsx`).
+- Hooks: `useCamelCase.ts` (e.g., `useGestureMachine.ts`, `usePrefersReducedMotion.ts`, `useApi.ts`).
+- Pure modules: `camelCase.ts` (e.g., `stateMachine.ts`, `lazyProvision.ts`).
+- Server routes: noun module per resource (`server/routes/me.ts`).
 - Data modules: `kebab-case.ts` (e.g., `seeded-cities.ts`).
-- Type modules: lowercase noun (e.g., `reel.ts`).
+- Tests: `<source>.test.ts` co-located beside the source (e.g., `stateMachine.test.ts`, `server/auth/jwt.test.ts`).
 
-**Functions:**
-- `camelCase` for all functions including React components used inline (e.g., `formatArrivedAt`, `transition`).
-- Exported components are `export function PascalCase()` — named exports, no defaults.
-- Event handlers in components are `onSomething` (`onPointerDown`, `onUserMapInteract`); the handler bodies refer to them as `handleXxx` only if the prop name is taken.
+**Functions, variables, types:**
+- `camelCase` for functions and variables; exported components are `export function PascalCase()` — named exports, no defaults.
+- `UPPER_SNAKE_CASE` for tunable module-level constants (`LONG_PRESS_MS`, `FLICK_THRESHOLD_PX`, `ISSUER` in `server/auth/jwt.ts:22`).
+- Refs suffixed `Ref` (e.g., `pointersRef`, `mapRef`).
+- `PascalCase` for `interface` and `type` aliases. No `I` prefix. Discriminated unions on `type` field (`ReelEvent`, Auth0Payload extends `JWTPayload` at `server/auth/jwt.ts:44`).
+- Test stubs use the `__doubleUnderscorePrefix` convention to flag a non-production export (`__setJwksGetterForTest` at `server/auth/jwt.ts:32`).
 
-**Variables and constants:**
-- `camelCase` for variables.
-- `UPPER_SNAKE_CASE` for module-level constants intended as tunables (e.g., `LONG_PRESS_MS`, `FLICK_THRESHOLD_PX`, `FLY_DURATION_MS`).
-- Refs are suffixed `Ref` (e.g., `pointersRef`, `mapRef`).
+## Module Shape
 
-**Types and interfaces:**
-- `PascalCase` for both `interface` and `type` aliases (e.g., `ReelState`, `CityChapter`, `Coordinates`).
-- No `I` prefix on interfaces.
-- Discriminated unions on `type` field (e.g., `ReelEvent`).
-
-## Code Style
-
-**Module shape:**
-- One concept per file. Components, hooks, and pure modules each get their own.
+- One concept per file. Components, hooks, pure modules, routes each get their own.
 - No barrel `index.ts` re-exports.
-- No default exports — named exports only. Reason: better refactor/rename ergonomics, clearer call sites.
+- No default exports — named exports only.
+- Files target ~200–400 lines; the only file pushing that envelope is `src/gestures/stateMachine.test.ts` (822 lines, intentional — exhaustive transition coverage).
 
-**Imports:**
-- `@/...` path alias for cross-directory imports (e.g., `@/types/reel`, `@/data/seeded-cities`).
-- Relative imports only inside the same directory (`./stateMachine`).
-- `import type` is used wherever the symbol is purely structural (`verbatimModuleSyntax` is on, so this is required).
+## Imports
 
-**Immutability:**
-- Every state transition in `stateMachine.ts` returns a NEW object. Never mutate state in place.
+**Frontend (`src/**`)** — TypeScript project `tsconfig.app.json` uses `moduleResolution: "bundler"` and Vite resolves the alias:
+- `@/...` for cross-directory imports (e.g., `import { initialState } from '@/gestures/stateMachine'` at `stateMachine.test.ts:1`).
+- Relative `./` only inside the same directory.
+- No file extension on imports — Vite/bundler resolves.
+
+**Server (`server/**`, `scripts/**`)** — TypeScript project `tsconfig.server.json` uses `module: "NodeNext"`. The `@server/*` path alias is declared but **does not resolve at `tsx` runtime**. Phase 4 fell back to relative imports with explicit `.js` extensions:
+- `import { env } from './env.js'` (`server/index.ts:4`).
+- `import { requireJwt } from './auth/jwt.js'` (`server/index.ts:5`).
+- The `.js` extension is mandatory under NodeNext even though source files end in `.ts`.
+- Side-effect-only imports use the same form (`import './auth/context.js'` at `server/index.ts:12`) — comment must explain WHY.
+
+**Type-only imports:** `verbatimModuleSyntax: true` is on in both project configs, so every type-only symbol must use `import type { ... }`. Mixed default+type imports are not allowed.
+
+## Immutability
+
+- Every state transition in `src/gestures/stateMachine.ts` returns a NEW object via spread; never mutate.
+- Drizzle queries return new row objects — never mutated in place.
+- `Object.freeze(parsed.data)` on the env export at `server/env.ts:32` to prevent runtime tampering.
 - `as const` on top-level data tables (`SEEDED_CITIES`).
-- `readonly` on every interface field that doesn't need to vary (e.g., all of `CityChapter`).
-- Tuples typed `readonly [number, number]` not `[number, number]`.
+- `readonly` on every interface field that doesn't need to vary; tuples typed `readonly [number, number]`.
 
-**React patterns:**
-- Hooks own all side effects (timers, listeners, MapLibre instance). Components are presentational where possible.
-- `useReducer` is used for state machines (see `useGestureMachine`); `useState` for local UI flags only.
-- Effects with timers always clean up via a single `clear(ref)` helper that nulls the ref.
-- StrictMode is on (`src/main.tsx`); double-invocation behavior verified in dev.
-- `key=` is used to force-remount when arrival animations need to re-fire (see `ChapterOverlay key={chapter.id}` in `Reel.tsx`).
+## React Patterns
 
-**Refs vs state:**
-- DOM nodes, MapLibre map instances, timer IDs, pointer Maps — all `useRef`.
-- Anything that should trigger re-render — `useState` / `useReducer`.
-- A `stateRef.current = state` mirror is used inside the gesture hook so imperative event handlers can read the latest state without re-binding listeners on every render.
+- Hooks own all side effects (timers, listeners, MapLibre instance, fetch). Components stay presentational where possible.
+- `useReducer` for state machines (see `useGestureMachine`); `useState` for local UI flags.
+- Effects with timers always clean up via a `clear(ref)` helper that nulls the ref.
+- StrictMode is on (`src/main.tsx`); double-invocation is expected in dev.
+- `key=` is used to force-remount when arrival animations need to re-fire (`ChapterOverlay key={chapter.id}` in `Reel.tsx`).
+- Custom hooks expose stable callbacks via `useCallback` (`src/auth/useApi.ts:13`).
 
-## Comments
+## Refs vs State
 
-**Default: no comment.** Add one only when the WHY is non-obvious — a hidden constraint, a surprising platform behavior, a load-bearing decision.
+- DOM nodes, MapLibre map instances, timer IDs, pointer Maps → `useRef`.
+- Anything that should trigger re-render → `useState` / `useReducer`.
+- A `stateRef.current = state` mirror lets imperative pointer handlers read the latest state without rebinding listeners every render.
 
-**Examples in this codebase:**
-- `useGestureMachine.ts` § "Bind to element" — explains the `window + capture: true` trick because it's not obvious from the code.
-- `index.css` § `.reel-root` — comment names the platform reason for `touch-action: none`.
-- `MapCanvas.tsx` § eslint-disable line — explains why `chapters` and `onUserMapInteract` are intentionally not deps of the init effect.
+## TypeScript Strictness (both projects)
 
-**Avoid:**
-- "What" comments that restate the code.
-- Reference to PR numbers, issue IDs, or session history. Those go in commit messages.
-
-## TypeScript Specifics
-
-**Strictness flags on:**
 - `strict: true`
 - `noUnusedLocals`, `noUnusedParameters`
 - `noFallthroughCasesInSwitch`
-- `noUncheckedSideEffectImports`
-- `erasableSyntaxOnly` (no enums, no const enums, no namespaces)
-- `verbatimModuleSyntax` (forces `import type` for type-only imports)
+- `verbatimModuleSyntax: true` — forces `import type` for type-only symbols
+- App also: `erasableSyntaxOnly`, `noUncheckedSideEffectImports`
 
-**Patterns this implies:**
+**Implications:**
 - No `enum` — use string-literal unions (`ReelStateName = 'IDLE' | 'SCRUBBING' | ...`).
-- No `namespace` — separate modules.
+- No `namespace` — separate modules instead.
 - Discriminated unions for events instead of class hierarchies.
+
+## Logging
+
+**No `console.log` in production paths.** Server uses `process.stderr.write(...)` for error diagnostics (`server/env.ts:28`, `server/auth/jwt.ts:70`). The single Hono `logger()` middleware at `server/index.ts:17` handles request logs. Frontend uses `console.warn`/`console.error` only at boundaries; no `console.log`.
+
+## Validation
+
+Zod is the schema validator at every boundary:
+- Server env validated at process start with `safeParse` then `process.exit(1)` on failure (`server/env.ts:24`).
+- Future API request bodies will follow the same pattern.
+
+## Dual Env-Var Convention
+
+Server-only secrets use bare names; frontend (Vite) requires the `VITE_` prefix to be inlined into the bundle:
+
+| Concern        | Server                  | Frontend                    |
+|----------------|-------------------------|-----------------------------|
+| Auth0 domain   | `AUTH0_DOMAIN`          | `VITE_AUTH0_DOMAIN`         |
+| Auth0 audience | `AUTH0_AUDIENCE`        | `VITE_AUTH0_AUDIENCE`       |
+| Auth0 client   | (n/a)                   | `VITE_AUTH0_CLIENT_ID`      |
+| Database       | `DATABASE_URL`          | (never exposed)             |
+
+Frontend env vars are typed in `src/vite-env.d.ts:4-6`. Server env is typed via the Zod schema in `server/env.ts:13`. **Never** expose a bare `AUTH0_*` to the client bundle and never put `DATABASE_URL` behind `VITE_`.
 
 ## CSS / Tailwind
 
-**Source-of-truth tokens:**
-- CSS custom properties in `src/index.css` `:root` (colors, easings, durations).
-- Tailwind theme extension mirrors a subset for utility-class access (colors, ease-* timings, font families).
-- Components reference tokens via Tailwind utilities (`bg-amber-400`) where possible; fall back to inline `style={{ ... }}` for dynamic values (e.g., scrub cursor gradient stop).
+- Source-of-truth tokens are CSS custom properties in `src/index.css :root` (colors, easings, durations).
+- Tailwind theme extends a subset (`tailwind.config.ts`) for utility access (`bg-amber-400`, `ease-arrival`, font families).
+- All frontend styling goes through Tailwind utilities; inline `style={{ ... }}` is reserved for genuinely dynamic values (e.g., scrub-cursor gradient stop).
+- Layered: `@layer base` for resets/tokens, `@layer components` for `.glass-pill` / `.scrim-*`, `@layer utilities` for `.text-display` / `.animate-arrival`.
+- `@media (prefers-reduced-motion: reduce)` zeroes durations as defense in depth even though `App.tsx` already swaps to the static reel.
 
-**Layers:**
-- `@layer base` — resets, root tokens, global typography, `.reel-root` lock CSS.
-- `@layer components` — semi-named utilities like `.glass-pill`, `.scrim-bottom`, `.scrim-top`.
-- `@layer utilities` — `.text-display`, `.text-caps`, `.animate-arrival` keyframes.
+## Comments
 
-**Reduced motion:**
-- `@media (prefers-reduced-motion: reduce)` block at the bottom of `index.css` zeroes all animation/transition durations as a defense in depth, even though the App-level branch already swaps to the static reel.
-
-## Error Handling
-
-**Currently minimal** — W1 is frontend-only with no network calls. Once W4 backend lands, conventions to enforce:
-- Validate every API response with Zod.
-- Try/catch only at boundary functions (data fetchers, event handlers); let the rest throw.
-- User-facing error UI; never `console.error` and move on.
-
-## Testing Conventions
-
-**Not yet established** — first tests land in W2 (gesture state machine unit tests via Vitest). Conventions to lock at that time:
-- Test files live next to source: `stateMachine.test.ts` next to `stateMachine.ts`.
-- Pure modules get unit tests; React components get RTL tests; full flows get Playwright.
+**Default: no comment.** Add one only when the WHY is non-obvious — a hidden constraint, a surprising platform behavior, or a load-bearing decision. Good examples: the trailing-slash explanation at `server/auth/jwt.ts:6-15`, the side-effect-import note at `server/index.ts:8-12`, the `touch-action: none` rationale in `src/index.css`. Avoid "what" comments and PR/issue references.
 
 ## Linting / Formatting
 
-**Currently:** TypeScript compiler is the only enforcement. No ESLint or Prettier config yet.
+Still none. TypeScript compiler is the only enforcement. ESLint + Prettier remain a planned add (no phase commitment yet).
 
-**Planned (W2+):** ESLint with `@typescript-eslint`, `react-hooks`, possibly `eslint-plugin-react-refresh`. Prettier via `editorconfig` style.
+---
+
+*Conventions refreshed: 2026-04-27*
