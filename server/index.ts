@@ -5,6 +5,7 @@ import { env } from './env.js';
 import { requireJwt } from './auth/jwt.js';
 import { lazyProvisionUser } from './auth/lazyProvision.js';
 import { meRouter } from './routes/me.js';
+import { citiesRouter } from './routes/cities.js';
 // Side-effect import: registers the Hono ContextVariableMap
 // augmentation so c.set('user', row) is typed as User (not unknown)
 // across this process. Removing this import would silently relax
@@ -32,6 +33,10 @@ app.get('/api/health', (c) => c.json({ status: 'ok' }));
 app.use('/api/me', requireJwt, lazyProvisionUser);
 app.use('/api/me/*', requireJwt, lazyProvisionUser);
 app.route('/api/me', meRouter);
+
+app.use('/api/cities', requireJwt, lazyProvisionUser);
+app.use('/api/cities/*', requireJwt, lazyProvisionUser);
+app.route('/api/cities', citiesRouter);
 
 serve(
   { fetch: app.fetch, port: env.PORT },
