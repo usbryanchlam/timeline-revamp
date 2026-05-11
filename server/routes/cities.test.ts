@@ -212,3 +212,186 @@ describe('GET /api/cities (05-01 task 1)', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('POST /api/cities (05-02 task 1)', () => {
+  beforeEach(async () => {
+    await cleanup();
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  // Minimal valid body shared across the validation tests. Defaults for
+  // zoom/pitch/bearing come from createCitySchema, so the request body
+  // is intentionally small.
+  const validBody = (): Record<string, unknown> => ({
+    name: 'Tokyo',
+    lat: 35.6812,
+    lng: 139.7671,
+    arrivedAt: '2025-01-15T00:00:00Z',
+    caption: 'arrived',
+  });
+
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  it('returns 401 with no Authorization header', async () => {
+    const res = await buildApp().request('/api/cities', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(validBody()),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('creates a city for a fresh user → 201, orderIndex 0, userId === me.id', async () => {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    const res = await buildApp().request('/api/cities', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(validBody()),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      id: string;
+      userId: string;
+      orderIndex: number;
+      name: string;
+    };
+    expect(body.id).toMatch(UUID_RE);
+    expect(body.orderIndex).toBe(0);
+    expect(body.name).toBe('Tokyo');
+
+    const [userA] = await db.select().from(users).where(eq(users.auth0Sub, SUB_A));
+    if (!userA) throw new Error('test setup failed: user A missing');
+    expect(body.userId).toBe(userA.id);
+  });
+
+  it('assigns orderIndex 1 to a second POST from the same user', async () => {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    const app = buildApp();
+
+    const r1 = await app.request('/api/cities', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ ...validBody(), name: 'First' }),
+    });
+    expect(r1.status).toBe(201);
+
+    const r2 = await app.request('/api/cities', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ ...validBody(), name: 'Second' }),
+    });
+    expect(r2.status).toBe(201);
+    const body = (await r2.json()) as { orderIndex: number; name: string };
+    expect(body.orderIndex).toBe(1);
+    expect(body.name).toBe('Second');
+  });
+
+  it('rejects client-supplied orderIndex with 422 (strict mode)', async () => {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    const res = await buildApp().request('/api/cities', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ ...validBody(), orderIndex: 99 }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('rejects out-of-range lat with 422', async () => {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    const res = await buildApp().request('/api/cities', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ ...validBody(), lat: 91 }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('rejects empty body with 422 (missing required fields)', async () => {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    const res = await buildApp().request('/api/cities', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('concurrent POSTs admit both [201,201] and [201,409] (DEFERRABLE COMMIT-conflict contract)', async () => {
+    // Seed user A with 3 pre-existing cities at orderIndex 0,1,2.
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    const app = buildApp();
+    // Provision A.
+    await app.request('/api/cities', {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    const [userA] = await db.select().from(users).where(eq(users.auth0Sub, SUB_A));
+    if (!userA) throw new Error('test setup failed: user A missing');
+
+    const arrivedAt = new Date('2025-01-01T00:00:00Z');
+    await db.insert(cities).values([
+      { userId: userA.id, orderIndex: 0, name: 'Seed0', lat: 0, lng: 0, zoom: 12, pitch: 50, bearing: 0, arrivedAt },
+      { userId: userA.id, orderIndex: 1, name: 'Seed1', lat: 0, lng: 0, zoom: 12, pitch: 50, bearing: 0, arrivedAt },
+      { userId: userA.id, orderIndex: 2, name: 'Seed2', lat: 0, lng: 0, zoom: 12, pitch: 50, bearing: 0, arrivedAt },
+    ]);
+
+    // Fire two concurrent POSTs. Each should land at orderIndex 3 then 4
+    // (transaction serialization) OR one wins and the other catches 23505
+    // at COMMIT and returns 409.
+    const [res1, res2] = await Promise.all([
+      app.request('/api/cities', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenA}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ ...validBody(), name: 'RaceA' }),
+      }),
+      app.request('/api/cities', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenA}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ ...validBody(), name: 'RaceB' }),
+      }),
+    ]);
+
+    const statuses = [res1.status, res2.status].sort();
+    // see plan 05-02 Task 1: DEFERRABLE COMMIT-conflict admits both outcomes.
+    // DO NOT tighten to expect(both).toBe(201). Postgres may serialize the
+    // two transactions either way; both [201,201] and [201,409] satisfy
+    // the contract and excluding either masks a legitimate code path.
+    expect([JSON.stringify([201, 201]), JSON.stringify([201, 409])]).toContain(
+      JSON.stringify(statuses),
+    );
+
+    // Regardless of outcome, the DB should have NO duplicate orderIndex
+    // values for this user. If both succeeded → indexes [0,1,2,3,4].
+    // If one succeeded → [0,1,2,3]. Either way: no duplicates, no gap
+    // below the new max.
+    const rows = await db.select().from(cities).where(eq(cities.userId, userA.id));
+    const indexes = rows.map((r) => r.orderIndex).sort((a, b) => a - b);
+    expect(new Set(indexes).size).toBe(indexes.length); // no duplicates
+    if (statuses[1] === 201) {
+      expect(indexes).toEqual([0, 1, 2, 3, 4]);
+    } else {
+      expect(indexes).toEqual([0, 1, 2, 3]);
+    }
+  });
+});
