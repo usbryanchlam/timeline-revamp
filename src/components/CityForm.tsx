@@ -23,7 +23,7 @@
 // via Tailwind responsive utilities. Backdrop click cancels; click on the
 // sheet itself does not propagate.
 
-import { useState, type FormEvent, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
 import { useApi } from '@/auth/useApi';
 import type { CityDTO } from '@/types/city';
 
@@ -100,6 +100,34 @@ export function CityForm(props: CityFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Mount guard: prevents state writes / save callbacks from firing after the
+  // user cancels mid-submit and the parent tears this form down. Without this,
+  // a "cancelled" save would still land in the list — surprising UX.
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    [],
+  );
+
+  // Initial focus on the name input for keyboard users opening the sheet.
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    nameInputRef.current?.focus();
+  }, []);
+
+  // Escape-to-close. Ignored while a network request is in flight so the user
+  // doesn't accidentally abandon a save they meant to complete.
+  const onCancel = props.onCancel;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !submitting && !deleting) onCancel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [submitting, deleting, onCancel]);
+
   const lat = props.mode === 'create' ? props.prefill.lat : props.city.lat;
   const lng = props.mode === 'create' ? props.prefill.lng : props.city.lng;
 
@@ -117,8 +145,14 @@ export function CityForm(props: CityFormProps) {
     setError(null);
     setSubmitting(true);
 
-    // arrivedAt is YYYY-MM-DD; let Zod's z.coerce.date() parse it. Caption is
-    // omitted (not sent as empty string) so the server stores null.
+    // Anchor the date-input value (YYYY-MM-DD, no tz) to the user's LOCAL
+    // midnight before sending. Submitting the bare string lets the server's
+    // z.coerce.date() parse it as UTC midnight, which renders back a day off
+    // for users east/west of UTC. Local-midnight + .toISOString() preserves
+    // "the day the user picked" in their own locale on render.
+    const arrivedAtIso = new Date(`${arrivedAt}T00:00:00`).toISOString();
+
+    // Caption is omitted (not sent as empty string) so the server stores null.
     const captionToSend = caption.trim().length > 0 ? caption : undefined;
 
     try {
@@ -131,7 +165,7 @@ export function CityForm(props: CityFormProps) {
                 name: trimmedName,
                 lat,
                 lng,
-                arrivedAt,
+                arrivedAt: arrivedAtIso,
                 caption: captionToSend,
               }),
             })
@@ -140,13 +174,19 @@ export function CityForm(props: CityFormProps) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 name: trimmedName,
-                arrivedAt,
+                arrivedAt: arrivedAtIso,
                 caption: captionToSend,
               }),
             });
 
+      // Mount-guard after the network round-trip — if the user cancelled
+      // mid-submit, drop the result on the floor instead of mutating state
+      // or notifying the parent that a "cancelled" save succeeded.
+      if (!mountedRef.current) return;
+
       if (res.status === 422) {
         const body = await readErrorBody(res);
+        if (!mountedRef.current) return;
         setError(body?.issues?.[0]?.message ?? NETWORK_ERROR);
         return;
       }
@@ -160,24 +200,27 @@ export function CityForm(props: CityFormProps) {
       }
 
       const saved = (await res.json()) as CityDTO;
+      if (!mountedRef.current) return;
       props.onSaved(saved);
     } catch {
+      if (!mountedRef.current) return;
       setError(NETWORK_ERROR);
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) setSubmitting(false);
     }
   }
 
   async function handleDelete() {
     if (props.mode !== 'edit') return;
     if (submitting || deleting) return;
-    if (!window.confirm('Delete this city? Photos and reorder data will be lost.')) {
+    if (!window.confirm("Delete this city? This can't be undone.")) {
       return;
     }
     setError(null);
     setDeleting(true);
     try {
       const res = await api(`/api/cities/${props.city.id}`, { method: 'DELETE' });
+      if (!mountedRef.current) return;
       if (res.status === 204) {
         props.onDeleted(props.city.id);
         return;
@@ -191,9 +234,10 @@ export function CityForm(props: CityFormProps) {
       }
       setError(NETWORK_ERROR);
     } catch {
+      if (!mountedRef.current) return;
       setError(NETWORK_ERROR);
     } finally {
-      setDeleting(false);
+      if (mountedRef.current) setDeleting(false);
     }
   }
 
@@ -228,6 +272,7 @@ export function CityForm(props: CityFormProps) {
         onSubmit={handleSubmit}
         onClick={stopPropagation}
         role="dialog"
+        aria-modal="true"
         aria-label={title}
         className="
           fixed inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto
@@ -253,6 +298,7 @@ export function CityForm(props: CityFormProps) {
           </label>
           <input
             id="city-name"
+            ref={nameInputRef}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
