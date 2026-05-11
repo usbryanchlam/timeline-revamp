@@ -395,3 +395,262 @@ describe('POST /api/cities (05-02 task 1)', () => {
     }
   });
 });
+
+describe('PATCH /api/cities/:id (05-02 task 2)', () => {
+  beforeEach(async () => {
+    await cleanup();
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  // Seed a single city for user A and return { tokenA, userA, seeded }.
+  // Mirrors the inline seeding done in the GET /:id tests above but
+  // shared so the PATCH/DELETE tests stay focused on the assertion.
+  async function seedCityForA(): Promise<{
+    tokenA: string;
+    userAId: string;
+    seededId: string;
+    seededUpdatedAt: Date;
+  }> {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    // Provision user A by hitting an authenticated endpoint.
+    await buildApp().request('/api/cities', {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    const [userA] = await db.select().from(users).where(eq(users.auth0Sub, SUB_A));
+    if (!userA) throw new Error('test setup failed: user A missing');
+    const [seeded] = await db.insert(cities).values({
+      userId: userA.id,
+      orderIndex: 0,
+      name: 'Paris',
+      lat: 48.85,
+      lng: 2.35,
+      zoom: 11,
+      pitch: 45,
+      bearing: 0,
+      arrivedAt: new Date('2025-01-01T00:00:00Z'),
+      caption: 'original caption',
+    }).returning();
+    if (!seeded) throw new Error('test setup failed: city missing');
+    return {
+      tokenA,
+      userAId: userA.id,
+      seededId: seeded.id,
+      seededUpdatedAt: seeded.updatedAt,
+    };
+  }
+
+  it('PATCH with valid partial body → 200, only the patched field changes, updatedAt strictly advances', async () => {
+    const { tokenA, seededId, seededUpdatedAt } = await seedCityForA();
+
+    // Make sure enough wall-clock passes that a fresh Date() will be
+    // strictly greater than the seeded value. Postgres `timestamp` columns
+    // are microsecond precision, but JS Date.getTime() is millisecond
+    // resolution and Postgres rounds the stored value, so we need a
+    // comfortable gap to avoid a same-ms tie under fast CI.
+    await new Promise((r) => setTimeout(r, 50));
+
+    const res = await buildApp().request(`/api/cities/${seededId}`, {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ caption: 'new caption' }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      id: string;
+      name: string;
+      caption: string | null;
+      lat: number;
+      lng: number;
+      updatedAt: string;
+    };
+    expect(body.id).toBe(seededId);
+    expect(body.caption).toBe('new caption');
+    // Unchanged fields stay put.
+    expect(body.name).toBe('Paris');
+    expect(body.lat).toBe(48.85);
+    expect(body.lng).toBe(2.35);
+    // updatedAt must strictly advance.
+    expect(new Date(body.updatedAt).getTime()).toBeGreaterThan(
+      seededUpdatedAt.getTime(),
+    );
+  });
+
+  it('rejects orderIndex in PATCH body with 422 (strict mode — server is authoritative on ordering)', async () => {
+    const { tokenA, seededId } = await seedCityForA();
+    const res = await buildApp().request(`/api/cities/${seededId}`, {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ orderIndex: 99 }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('rejects unknown key id in PATCH body with 422 (mass-assignment defense)', async () => {
+    const { tokenA, seededId } = await seedCityForA();
+    const res = await buildApp().request(`/api/cities/${seededId}`, {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ id: 'foo' }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('PATCH of another user\'s row → 404 AND the row is UNCHANGED in the DB (cross-user mutation safety)', async () => {
+    // Seed a city owned by user A.
+    const { seededId, seededUpdatedAt } = await seedCityForA();
+    // Capture the full pre-state for a deep equality check after the
+    // attempted cross-user PATCH.
+    const [before] = await db.select().from(cities).where(eq(cities.id, seededId));
+    if (!before) throw new Error('test setup failed: pre-state row missing');
+
+    // User B attempts to PATCH user A's city.
+    const tokenB = await mint({ sub: SUB_B, email: EMAIL_B });
+    const res = await buildApp().request(`/api/cities/${seededId}`, {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenB}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ caption: 'pwned by B' }),
+    });
+    expect(res.status).toBe(404);
+
+    // CRITICAL: GET the row as the actual owner (user A) and verify the
+    // row in the DB is unchanged. This proves the WHERE filter blocks
+    // the mutation at the SQL layer, not just the response.
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    const ownerGet = await buildApp().request(`/api/cities/${seededId}`, {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    expect(ownerGet.status).toBe(200);
+    const owned = (await ownerGet.json()) as {
+      id: string;
+      caption: string | null;
+      updatedAt: string;
+    };
+    expect(owned.id).toBe(seededId);
+    expect(owned.caption).toBe('original caption');
+    // updatedAt should not have advanced past the seed value.
+    expect(new Date(owned.updatedAt).getTime()).toBe(seededUpdatedAt.getTime());
+  });
+
+  it('PATCH /api/cities/not-a-uuid with valid body → 404 (collapses Postgres 22P02 to not_found)', async () => {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    const res = await buildApp().request('/api/cities/not-a-uuid', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ caption: 'whatever' }),
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('DELETE /api/cities/:id (05-02 task 2)', () => {
+  beforeEach(async () => {
+    await cleanup();
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  async function seedCityForA(): Promise<{ tokenA: string; seededId: string }> {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    await buildApp().request('/api/cities', {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    const [userA] = await db.select().from(users).where(eq(users.auth0Sub, SUB_A));
+    if (!userA) throw new Error('test setup failed: user A missing');
+    const [seeded] = await db.insert(cities).values({
+      userId: userA.id,
+      orderIndex: 0,
+      name: 'Paris',
+      lat: 48.85,
+      lng: 2.35,
+      zoom: 11,
+      pitch: 45,
+      bearing: 0,
+      arrivedAt: new Date('2025-01-01T00:00:00Z'),
+    }).returning();
+    if (!seeded) throw new Error('test setup failed: city missing');
+    return { tokenA, seededId: seeded.id };
+  }
+
+  it('DELETE owned row → 204 empty body, then GET /:id as owner → 404 (row is gone)', async () => {
+    const { tokenA, seededId } = await seedCityForA();
+    const app = buildApp();
+
+    const del = await app.request(`/api/cities/${seededId}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    expect(del.status).toBe(204);
+    // 204 must carry an empty body.
+    const text = await del.text();
+    expect(text).toBe('');
+
+    // Row really is gone — GET as the same owner returns 404.
+    const followup = await app.request(`/api/cities/${seededId}`, {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    expect(followup.status).toBe(404);
+  });
+
+  it('DELETE another user\'s row → 404 AND the row STILL EXISTS unchanged (cross-user delete safety)', async () => {
+    const { tokenA, seededId } = await seedCityForA();
+
+    // Capture pre-state to compare after the attempted cross-user delete.
+    const [before] = await db.select().from(cities).where(eq(cities.id, seededId));
+    if (!before) throw new Error('test setup failed: pre-state row missing');
+
+    // User B attempts to DELETE user A's city.
+    const tokenB = await mint({ sub: SUB_B, email: EMAIL_B });
+    const res = await buildApp().request(`/api/cities/${seededId}`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${tokenB}` },
+    });
+    expect(res.status).toBe(404);
+
+    // CRITICAL: GET the row as the owner and verify it still exists.
+    const ownerGet = await buildApp().request(`/api/cities/${seededId}`, {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    expect(ownerGet.status).toBe(200);
+    const owned = (await ownerGet.json()) as {
+      id: string;
+      name: string;
+      updatedAt: string;
+    };
+    expect(owned.id).toBe(seededId);
+    expect(owned.name).toBe('Paris');
+    // updatedAt unchanged — no mutation happened.
+    expect(new Date(owned.updatedAt).getTime()).toBe(before.updatedAt.getTime());
+  });
+
+  it('DELETE a valid-format UUID with no matching row → 404', async () => {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    const res = await buildApp().request(
+      '/api/cities/00000000-0000-0000-0000-000000000000',
+      {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${tokenA}` },
+      },
+    );
+    expect(res.status).toBe(404);
+  });
+});

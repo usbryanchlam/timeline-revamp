@@ -3,6 +3,9 @@
  * raw pg. Drizzle wraps pg errors in `DrizzleQueryError`, putting the original
  * code on `err.cause.code`. Raw pg throws errors with `err.code` directly.
  * This helper handles both shapes.
+ *
+ * Intentionally only unwraps one level of `cause` — Drizzle wraps once;
+ * revisit if upgrades change this.
  */
 export function pgErrorCode(err: unknown): string | undefined {
   if (err == null || typeof err !== 'object') return undefined;

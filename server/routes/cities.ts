@@ -3,7 +3,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { cities } from '../db/schema.js';
 import { pgErrorCode } from '../db/pgError.js';
-import { createCitySchema } from '../validation/cityInput.js';
+import { createCitySchema, updateCitySchema } from '../validation/cityInput.js';
 
 // /api/cities sub-router. Mounted in server/index.ts behind the
 // requireJwt + lazyProvisionUser middleware chain, so c.var.user is
@@ -105,6 +105,78 @@ citiesRouter.post('/', async (c) => {
     // race for the same order_index and committed first. Surface as 409
     // so the client can retry.
     if (pgErrorCode(err) === '23505') return c.json({ error: 'conflict_retry' }, 409);
+    throw err;
+  }
+});
+
+// PATCH /api/cities/:id — partial update of a city owned by the requester.
+//
+// updateCitySchema = createCitySchema.partial().strict(), so:
+//   - any unknown key (orderIndex, id, userId, createdAt, ...) → 422
+//   - all known keys are optional
+// The handler builds the SET object exclusively from parsed.data — the raw
+// request body is never spread. This is the mass-assignment defense: even
+// if .strict() were ever loosened, only validated keys can reach the SQL.
+//
+// The WHERE clause is (id = ? AND user_id = me.id), so a row that exists
+// but belongs to another user reads as "0 rows updated" — same 404 trust
+// boundary as GET /:id (no cross-user existence leak).
+//
+// updatedAt is set explicitly so the column actually moves on every PATCH,
+// independent of any DB-level trigger.
+citiesRouter.patch('/:id', async (c) => {
+  const me = c.var.user;
+  const id = c.req.param('id');
+  const raw = await c.req.json().catch(() => null);
+  const parsed = updateCitySchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: 'invalid_input', issues: parsed.error.issues }, 422);
+  }
+
+  try {
+    // Build the patch object from validated keys only. NEVER spread `raw`.
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    for (const [k, v] of Object.entries(parsed.data)) {
+      if (v !== undefined) patch[k] = v;
+    }
+
+    const [updated] = await db.update(cities)
+      .set(patch)
+      .where(and(eq(cities.id, id), eq(cities.userId, me.id)))
+      .returning();
+    if (!updated) return c.json({ error: 'not_found' }, 404);
+    return c.json(updated);
+  } catch (err) {
+    // Same shape as GET /:id: collapse only 22P02 (malformed UUID) to 404,
+    // re-throw everything else so real DB failures surface as 5xx.
+    if (pgErrorCode(err) === '22P02') return c.json({ error: 'not_found' }, 404);
+    throw err;
+  }
+});
+
+// DELETE /api/cities/:id — remove a city owned by the requester.
+//
+// 204 on successful delete (empty body), 404 when no matching row exists
+// for this user (whether the row is missing entirely or belongs to another
+// user — same cross-user 404 trust boundary as GET/PATCH).
+//
+// Photo rows are dropped via FK CASCADE (server/db/schema.ts photos.cityId
+// references cities.id ON DELETE CASCADE). No manual cleanup needed.
+//
+// order_index is deliberately NOT compacted after delete; gaps are fine
+// and re-numbering is the job of /api/cities/reorder (Plan 05-03).
+citiesRouter.delete('/:id', async (c) => {
+  const me = c.var.user;
+  const id = c.req.param('id');
+  try {
+    const result = await db.delete(cities)
+      .where(and(eq(cities.id, id), eq(cities.userId, me.id)))
+      .returning({ id: cities.id });
+    if (result.length === 0) return c.json({ error: 'not_found' }, 404);
+    c.status(204);
+    return c.body(null);
+  } catch (err) {
+    if (pgErrorCode(err) === '22P02') return c.json({ error: 'not_found' }, 404);
     throw err;
   }
 });
