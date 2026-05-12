@@ -1,11 +1,18 @@
 import { SEEDED_CITIES } from '@/data/seeded-cities';
+import type { CityChapter } from '@/types/reel';
+
+interface ReducedMotionReelProps {
+  readonly chapters?: readonly CityChapter[];
+}
 
 /**
  * Static fallback for `prefers-reduced-motion: reduce`. No map, no animation,
  * native scroll. Same data, Lighthouse-clean. This is a launch-gate path
  * (a11y audit verifies it works keyboard-only and reads cleanly in VoiceOver).
  */
-export function ReducedMotionReel() {
+export function ReducedMotionReel({
+  chapters = SEEDED_CITIES,
+}: ReducedMotionReelProps = {}) {
   return (
     <main className="reel-static-root bg-bg text-ink">
       <header className="px-5 pt-12 pb-6 max-w-screen-sm mx-auto">
@@ -17,7 +24,7 @@ export function ReducedMotionReel() {
       </header>
 
       <ol className="px-5 pb-16 space-y-8 max-w-screen-sm mx-auto">
-        {SEEDED_CITIES.map((c, i) => (
+        {chapters.map((c, i) => (
           <li
             key={c.id}
             className="border-t border-line pt-6 first:border-t-0 first:pt-0"

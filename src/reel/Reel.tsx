@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef } from 'react';
 import { SEEDED_CITIES } from '@/data/seeded-cities';
 import { useGestureMachine } from '@/gestures/useGestureMachine';
+import type { CityChapter } from '@/types/reel';
 import { MapPoster } from './MapPoster';
 import { ChapterOverlay } from './ChapterOverlay';
 import { ChapterRail } from './ChapterRail';
@@ -24,11 +25,15 @@ const MapCanvas = lazy(() =>
  * The aria-live region announces chapter changes for AT users; the visual
  * surface is `role="region"` (NOT application — see DESIGN doc rationale).
  */
-export function Reel() {
+interface ReelProps {
+  readonly chapters?: readonly CityChapter[];
+}
+
+export function Reel({ chapters = SEEDED_CITIES }: ReelProps = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const { state, bind } = useGestureMachine({
-    totalChapters: SEEDED_CITIES.length,
+    totalChapters: chapters.length,
   });
 
   // Bind the container ref for both PointerEvents and the parent ref.
@@ -53,13 +58,13 @@ export function Reel() {
   // Aria-live announcement on chapter change.
   const liveRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const c = SEEDED_CITIES[state.chapterIndex];
+    const c = chapters[state.chapterIndex];
     if (c && liveRef.current) {
       liveRef.current.textContent = `${c.name}, ${formatMonthYear(c.arrivedAt)}`;
     }
-  }, [state.chapterIndex]);
+  }, [state.chapterIndex, chapters]);
 
-  const chapter = SEEDED_CITIES[state.chapterIndex];
+  const chapter = chapters[state.chapterIndex];
   if (!chapter) return null;
 
   return (
@@ -71,7 +76,7 @@ export function Reel() {
     >
       <Suspense fallback={<MapPoster />}>
         <MapCanvas
-          chapters={SEEDED_CITIES}
+          chapters={chapters}
           chapterIndex={state.chapterIndex}
           stateName={state.name}
           onUserMapInteract={onUserMapInteract}
@@ -85,10 +90,10 @@ export function Reel() {
         key={chapter.id}
         chapter={chapter}
         chapterNumber={state.chapterIndex + 1}
-        totalChapters={SEEDED_CITIES.length}
+        totalChapters={chapters.length}
       />
       <ChapterRail
-        total={SEEDED_CITIES.length}
+        total={chapters.length}
         currentIndex={state.chapterIndex}
         scrubT={state.scrubT}
       />
