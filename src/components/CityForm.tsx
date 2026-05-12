@@ -104,12 +104,16 @@ export function CityForm(props: CityFormProps) {
   // user cancels mid-submit and the parent tears this form down. Without this,
   // a "cancelled" save would still land in the list — surprising UX.
   const mountedRef = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Set true on every (re-)mount. React 18 StrictMode double-invokes the
+    // mount/cleanup cycle in dev — without resetting here, the first cleanup
+    // leaves mountedRef.current=false, and the live second mount never reaches
+    // its post-await branches (Save button gets stuck on "Saving").
+    mountedRef.current = true;
+    return () => {
       mountedRef.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   // Initial focus on the name input for keyboard users opening the sheet.
   const nameInputRef = useRef<HTMLInputElement>(null);
