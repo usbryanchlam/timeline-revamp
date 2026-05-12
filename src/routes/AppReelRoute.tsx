@@ -1,7 +1,6 @@
 import { Link } from 'react-router';
 import { useCitiesQuery } from '@/api/cities';
-import { citiesToChapters } from '@/data/cityToChapter';
-import { groupChapters } from '@/reel/groupChapters';
+import { groupChapters, groupsToChapters } from '@/reel/groupChapters';
 import { Reel } from '@/reel/Reel';
 import { ReducedMotionReel } from '@/reel/ReducedMotionReel';
 import { usePrefersReducedMotion } from '@/reel/usePrefersReducedMotion';
@@ -33,7 +32,7 @@ export function AppReelRoute() {
           <button
             type="button"
             onClick={() => void refetch()}
-            className="bg-amber-500 text-black px-4 py-2 rounded-lg font-semibold"
+            className="bg-amber-500 text-black px-4 py-2 rounded-lg font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             Retry
           </button>
@@ -52,7 +51,7 @@ export function AppReelRoute() {
           </p>
           <Link
             to="/app/trips"
-            className="inline-block bg-amber-500 text-black px-4 py-2 rounded-lg font-semibold"
+            className="inline-block bg-amber-500 text-black px-4 py-2 rounded-lg font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             Add a city
           </Link>
@@ -65,8 +64,8 @@ export function AppReelRoute() {
   // BEFORE mapping to CityChapter. For Phase 5 we project each group to its
   // first member; the group's `members` array is preserved on ChapterGroup
   // for Phase 6+ photo cycling (Reel.tsx can read it then).
-  const groups = groupChapters(cities);
-  const chapters = citiesToChapters(groups.map((g) => g.members[0]!));
+  // NOTE: country renders blank for /app/-reel chapters — see groupChapters.ts v1 limitation.
+  const chapters = groupsToChapters(groupChapters(cities));
 
   return (
     <div className="app-reel-host">

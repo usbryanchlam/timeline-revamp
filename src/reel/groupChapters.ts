@@ -1,4 +1,6 @@
+import { citiesToChapters } from '@/data/cityToChapter';
 import type { CityDTO } from '@/types/city';
+import type { CityChapter } from '@/types/reel';
 
 export interface ChapterGroup {
   readonly id: string;
@@ -58,4 +60,15 @@ export function groupChapters(cities: readonly CityDTO[]): readonly ChapterGroup
   });
 
   return groups;
+}
+
+/**
+ * Project each ChapterGroup to a single CityChapter for the reel pipeline.
+ * Phase 5: uses the first member of each group (members.length >= 1 always
+ * by groupChapters's invariant). Phase 6+ will rotate through members for
+ * photo cycling; consumers should call this helper rather than reading
+ * `g.members[0]` directly so the upgrade is local.
+ */
+export function groupsToChapters(groups: readonly ChapterGroup[]): readonly CityChapter[] {
+  return citiesToChapters(groups.map((g) => g.members[0]!));
 }
