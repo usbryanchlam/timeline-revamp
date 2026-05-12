@@ -33,7 +33,14 @@ interface MarkerInstance {
   readonly remove: () => void;
 }
 interface MarkerCtor {
-  new (opts: { element: HTMLElement }): MarkerInstance;
+  new (opts: {
+    element: HTMLElement;
+    // 'bottom' anchors the marker's tip to the coordinate (used by the
+    // teardrop saved-city pin). Default is 'center' (used by the draft dot).
+    anchor?:
+      | 'center' | 'top' | 'bottom' | 'left' | 'right'
+      | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  }): MarkerInstance;
 }
 interface MaplibreModule {
   readonly Map: new (opts: {
@@ -188,9 +195,17 @@ export function MapPicker({ cities, draftPin, onPick, onCityClick }: MapPickerPr
     // don't need to re-bind on every render.
     for (const city of cities) {
       const el = document.createElement('div');
-      el.style.cssText =
-        'width:10px;height:10px;border-radius:9999px;background:#A8B0C2;border:2px solid #0A0E1A;cursor:pointer;';
-      const marker = new maplibregl.Marker({ element: el })
+      // Teardrop pin. Dark navy fill + light stroke reads on any underlying
+      // tile color; the tail tip is anchored to the exact coordinate via
+      // Marker({ anchor: 'bottom' }). Draft pin (amber dot) stays a flat
+      // disc so the in-progress state visually outranks settled cities.
+      el.style.cssText = 'width:20px;height:28px;cursor:pointer;line-height:0;';
+      el.innerHTML =
+        '<svg width="20" height="28" viewBox="0 0 20 28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+        '<path d="M10 0C4.5 0 0 4.5 0 10c0 7.5 10 18 10 18s10-10.5 10-18C20 4.5 15.5 0 10 0z" fill="#0A0E1A" stroke="#E6EAF2" stroke-width="1.5"/>' +
+        '<circle cx="10" cy="10" r="3.5" fill="#E6EAF2"/>' +
+        '</svg>';
+      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([city.lng, city.lat])
         .addTo(map);
       el.addEventListener('click', (ev) => {
