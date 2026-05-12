@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { users } from '../db/schema.js';
+import { pgErrorCode } from '../db/pgError.js';
 import { validateHandle } from '../handles/validate.js';
 
 // /api/me sub-router. Mounted in server/index.ts behind the
@@ -64,10 +65,12 @@ meRouter.post('/handle', async (c) => {
     if (!updated) return c.json({ error: 'update_failed' }, 500);
     return c.json({ handle: updated.handle });
   } catch (err) {
-    // Postgres unique_violation = '23505'. The pg driver surfaces this
-    // as err.code on the underlying error.
-    const code = (err as { code?: string }).code;
-    if (code === '23505') return c.json({ error: 'taken' }, 409);
+    // Postgres unique_violation = '23505'. pgErrorCode unwraps both
+    // raw pg errors (err.code) and Drizzle's wrapped DrizzleQueryError
+    // (err.cause.code) — the latter is what we actually get under
+    // db.update(...).returning(), so the bare err.code check would
+    // never fire and duplicate handles would 500 instead of 409.
+    if (pgErrorCode(err) === '23505') return c.json({ error: 'taken' }, 409);
     throw err; // any other failure → bubble to global error handler (Hono returns 500)
   }
 });
