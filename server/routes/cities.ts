@@ -152,10 +152,12 @@ citiesRouter.patch('/reorder', async (c) => {
   // COMMITs on resolve, ROLLBACKs on throw. The DEFERRABLE unique
   // constraint on (user_id, order_index) is checked exactly once, at
   // COMMIT — intermediate states with duplicate index values are tolerated.
+  // One timestamp for the whole batch — easier to diff "what changed in this reorder."
+  const now = new Date();
   await db.transaction(async (tx) => {
     for (const it of parsed.data.items) {
       await tx.update(cities)
-        .set({ orderIndex: it.orderIndex, updatedAt: new Date() })
+        .set({ orderIndex: it.orderIndex, updatedAt: now })
         .where(and(eq(cities.id, it.id), eq(cities.userId, me.id)));
     }
   });

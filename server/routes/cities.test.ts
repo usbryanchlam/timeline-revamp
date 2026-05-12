@@ -838,6 +838,28 @@ describe('PATCH /api/cities/reorder (05-03 task 1)', () => {
     expect(res.status).toBe(422);
   });
 
+  it('duplicate id in body → 422 (Zod superRefine)', async () => {
+    const { tokenA, seededIds } = await seedNCitiesForA(3);
+    const res = await buildApp().request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          { id: seededIds[0], orderIndex: 0 },
+          { id: seededIds[0], orderIndex: 1 },
+          { id: seededIds[1], orderIndex: 2 },
+        ],
+      }),
+    });
+    expect(res.status).toBe(422);
+    const body = await res.json() as { error: string; issues: Array<{ message: string }> };
+    expect(body.error).toBe('invalid_input');
+    expect(body.issues.some((i) => i.message.includes('duplicate id'))).toBe(true);
+  });
+
   it('gap in orderIndex set [0, 2, 3] → 422 (must be 0..n-1)', async () => {
     const { tokenA, seededIds } = await seedNCitiesForA(3);
     const res = await buildApp().request('/api/cities/reorder', {
