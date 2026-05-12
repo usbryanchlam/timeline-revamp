@@ -154,11 +154,19 @@ export function MapPicker({ cities, draftPin, onPick, onCityClick }: MapPickerPr
 
     return () => {
       cancelled = true;
+      // Dispose markers BEFORE the map container goes away. Custom event
+      // listeners on marker DOM elements (see cities-sync effect) hold
+      // closures over city ids/callbacks — explicit .remove() lets the
+      // library clear those before the map tears down.
+      for (const m of cityMarkersRef.current) m.remove();
+      cityMarkersRef.current = [];
+      if (draftMarkerRef.current) {
+        draftMarkerRef.current.remove();
+        draftMarkerRef.current = null;
+      }
       if (mapInstance) mapInstance.remove();
       mapRef.current = null;
       maplibreGlRef.current = null;
-      draftMarkerRef.current = null;
-      cityMarkersRef.current = [];
     };
     // Single-shot init: cities are intentionally NOT in deps. The cities-sync
     // effect below owns marker rendering and reacts to prop changes there.

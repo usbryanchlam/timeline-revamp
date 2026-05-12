@@ -19,7 +19,7 @@
 // (Space picks up, Arrows move, Enter drops). We don't disable or replace it.
 // `prefers-reduced-motion` is also handled automatically by the library.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -69,29 +69,34 @@ export function CityList({ cities, onCardClick, onReorder }: CityListProps) {
     }),
   );
 
+  // Gate against concurrent drags — see Phase 5-03 Task 3 review notes.
+  const pendingRef = useRef(false);
+
   const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
+    async (event: DragEndEvent) => {
+      if (pendingRef.current) return; // a reorder is in flight — ignore second drag
       const { active, over } = event;
       if (!over || active.id === over.id) return;
 
       const oldIndex = order.indexOf(String(active.id));
       const newIndex = order.indexOf(String(over.id));
       if (oldIndex < 0 || newIndex < 0) return;
+      if (oldIndex === newIndex) return;
 
       const previous = order;
       const newOrder = arrayMove([...order], oldIndex, newIndex);
       setOrder(newOrder); // optimistic
-
-      void (async () => {
-        try {
-          await onReorder(newOrder);
-        } catch {
-          // Revert on failure — caller's refetch will resync to server truth
-          // shortly, but reverting immediately avoids a visible "wrong then
-          // right" flicker.
-          setOrder(previous);
-        }
-      })();
+      pendingRef.current = true;
+      try {
+        await onReorder(newOrder);
+      } catch {
+        // Revert on failure — caller's refetch will resync to server truth
+        // shortly, but reverting immediately avoids a visible "wrong then
+        // right" flicker.
+        setOrder(previous);
+      } finally {
+        pendingRef.current = false;
+      }
     },
     [order, onReorder],
   );
@@ -150,7 +155,7 @@ function SortableCityRow({ city, onCardClick }: SortableCityRowProps) {
         <button
           type="button"
           onClick={() => onCardClick(city.id)}
-          className="flex-1 text-left p-3 min-w-0"
+          className="flex-1 text-left p-3 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-elev"
         >
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-ink font-semibold truncate">{city.name}</span>
@@ -167,7 +172,7 @@ function SortableCityRow({ city, onCardClick }: SortableCityRowProps) {
         <button
           type="button"
           aria-label="Reorder"
-          className="px-3 flex items-center justify-center text-ink-mute hover:text-ink touch-none select-none min-w-[44px]"
+          className="px-3 flex items-center justify-center text-ink-mute hover:text-ink touch-none select-none min-w-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-elev"
           // Drag listeners ONLY on the handle — keeps the card body tappable
           // so onCardClick fires reliably.
           {...attributes}
