@@ -9,6 +9,10 @@ export default defineConfig({
     },
   },
   test: {
+    // Default environment is node; per-file annotations override for DOM tests.
+    // Component tests (src/components/*.test.tsx) and renderHook tests
+    // (src/hooks/*.test.ts) use @vitest-environment jsdom annotations.
+    // Server tests and pure-Node tests stay in the default node environment.
     environment: 'node',
     globals: true,
     include: [
