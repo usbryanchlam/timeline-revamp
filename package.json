@@ -28,13 +28,18 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "framer-motion": "^11",
+    "heic-to": "1.4.2",
     "hono": "^4.12.18",
     "jose": "^6.2.3",
     "maplibre-gl": "^5.0.0",
+    "oci-common": "2.131.1",
+    "oci-objectstorage": "2.131.1",
+    "p-limit": "7.3.0",
     "pg": "^8.20.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.15.0",
+    "sharp": "0.34.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
