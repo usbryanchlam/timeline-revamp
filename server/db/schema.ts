@@ -69,25 +69,36 @@ export const cities = pgTable('cities', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ─── photos ──────────────────────────────────────────────────────────
-// FK cascade: ON DELETE CASCADE on city_id — deleting a city deletes
-// its photos. (Bucket-side cleanup is a Phase 6 problem, not a schema one.)
-// Photo upload pipeline (DATA-05/06/07) lands in Phase 6; this table
-// exists now because DATA-01 says all four tables ship in Phase 4.
+// ─── photos (Phase 6: full upload pipeline) ────────────────────────
+// FK cascades:
+//   ON DELETE CASCADE on city_id → photos die with the city
+//   ON DELETE CASCADE on user_id → photos die with the user (denormalized
+//     for cheap ownership checks; the cities cascade would catch it too
+//     but the explicit FK makes the WHERE photos.userId = me.id queries
+//     safe regardless of join order)
+// status lifecycle: pending → ready (finalize success) | failed (rare)
+// masterKey + thumbKey are OCI object keys (not full URLs). Public URL
+// is constructed by server/oci/parClient.ts getPublicUrl().
 export const photos = pgTable('photos', {
   id: uuid('id').primaryKey().defaultRandom(),
   cityId: uuid('city_id')
     .notNull()
     .references(() => cities.id, { onDelete: 'cascade' }),
-  storageKey: text('storage_key').notNull(), // OCI Object Storage key (Phase 6)
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status', { enum: ['pending', 'ready', 'failed'] as const })
+    .notNull()
+    .default('pending'),
+  masterKey: text('master_key').notNull(),
   thumbKey: text('thumb_key'),
-  width: integer('width'),
-  height: integer('height'),
-  sizeBytes: integer('size_bytes'),
   caption: text('caption'),
   orderIndex: integer('order_index').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export type NewPhoto = typeof photos.$inferInsert;
 
 // ─── notifications ───────────────────────────────────────────────────
 // FK cascade: ON DELETE CASCADE on user_id. Used by MP4 export polling
