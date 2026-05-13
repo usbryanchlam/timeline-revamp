@@ -115,20 +115,9 @@ async function seedCity(userId: string, name = 'Paris'): Promise<string> {
   return city.id;
 }
 
-// Provision a user by hitting an authenticated endpoint, then look up the row.
-async function provisionUser(token: string): Promise<string> {
+// Provision user via any authenticated endpoint and return the user row id.
+async function ensureUser(sub: string, token: string): Promise<string> {
   const app = buildApp();
-  await app.request('/api/photos', { headers: { authorization: `Bearer ${token}` } });
-  const sub = await new SignJWT({}).sign(signKey).catch(() => '');
-  // We need the user row — look it up by auth0Sub based on the token's sub.
-  // Since this is test setup, just parse from our constants.
-  return '';
-}
-
-// More direct: return userId via db lookup after first auth hit.
-async function ensureUser(sub: string, email: string, token: string): Promise<string> {
-  const app = buildApp();
-  // Provision via any authenticated endpoint.
   await app.request('/api/photos', { headers: { authorization: `Bearer ${token}` } });
   const [row] = await db.select().from(users).where(eq(users.auth0Sub, sub));
   if (!row) throw new Error(`test setup: user ${sub} not provisioned`);
@@ -157,7 +146,7 @@ describe('POST /api/cities/:cityId/photos/upload-url', () => {
   it('returns 404 when cityId belongs to a different user (ownership leak prevented)', async () => {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
     const tokenB = await mint({ sub: SUB_B, email: EMAIL_B });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
+    const userAId = await ensureUser(SUB_A, tokenA);
     const cityId = await seedCity(userAId, 'Paris');
 
     // User B tries to upload to user A's city.
@@ -174,7 +163,7 @@ describe('POST /api/cities/:cityId/photos/upload-url', () => {
 
   it('returns 422 when sizeBytes > 5_242_880', async () => {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
+    const userAId = await ensureUser(SUB_A, tokenA);
     const cityId = await seedCity(userAId);
 
     const res = await buildApp().request(
@@ -190,7 +179,7 @@ describe('POST /api/cities/:cityId/photos/upload-url', () => {
 
   it('returns 422 when sizeBytes < 1', async () => {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
+    const userAId = await ensureUser(SUB_A, tokenA);
     const cityId = await seedCity(userAId);
 
     const res = await buildApp().request(
@@ -206,7 +195,7 @@ describe('POST /api/cities/:cityId/photos/upload-url', () => {
 
   it('returns 422 when contentType is not in allowed list', async () => {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
+    const userAId = await ensureUser(SUB_A, tokenA);
     const cityId = await seedCity(userAId);
 
     const res = await buildApp().request(
@@ -222,7 +211,7 @@ describe('POST /api/cities/:cityId/photos/upload-url', () => {
 
   it('returns 422 when city already has 10 photos with status != failed', async () => {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
+    const userAId = await ensureUser(SUB_A, tokenA);
     const cityId = await seedCity(userAId);
 
     // Seed 10 pending photos for this city.
@@ -250,7 +239,7 @@ describe('POST /api/cities/:cityId/photos/upload-url', () => {
 
   it('returns 201 with { photoId, uploadUrl } on success; creates photos row with status=pending', async () => {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
+    const userAId = await ensureUser(SUB_A, tokenA);
     const cityId = await seedCity(userAId);
 
     const res = await buildApp().request(
@@ -295,7 +284,7 @@ describe('POST /api/photos/:id/finalize', () => {
     cityId: string;
   }> {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
+    const userAId = await ensureUser(SUB_A, tokenA);
     const cityId = await seedCity(userAId);
     const [photo] = await db.insert(photos).values({
       cityId,
@@ -377,7 +366,7 @@ describe('DELETE /api/photos/:id', () => {
     photoId: string;
   }> {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
+    const userAId = await ensureUser(SUB_A, tokenA);
     const cityId = await seedCity(userAId);
     const [photo] = await db.insert(photos).values({
       cityId,
@@ -409,7 +398,7 @@ describe('DELETE /api/photos/:id', () => {
   it('returns 404 when photo not found OR when caller is not owner', async () => {
     const { photoId } = await seedPendingPhoto();
     const tokenB = await mint({ sub: SUB_B, email: EMAIL_B });
-    await ensureUser(SUB_B, EMAIL_B, tokenB);
+    await ensureUser(SUB_B, tokenB);
 
     // Cross-user delete — should read as not found.
     const res = await buildApp().request(`/api/photos/${photoId}`, {
@@ -432,7 +421,7 @@ describe('GET /api/cities/:cityId/photos', () => {
 
   it('returns only status=ready photos for the given city, scoped to me.id, ordered by orderIndex', async () => {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
+    const userAId = await ensureUser(SUB_A, tokenA);
     const cityId = await seedCity(userAId);
 
     // Seed 3 photos: 2 ready, 1 pending.
@@ -473,8 +462,8 @@ describe('GET /api/cities/:cityId/photos', () => {
   it('returns empty array for another user\'s city (no existence leak)', async () => {
     const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
     const tokenB = await mint({ sub: SUB_B, email: EMAIL_B });
-    const userAId = await ensureUser(SUB_A, EMAIL_A, tokenA);
-    await ensureUser(SUB_B, EMAIL_B, tokenB);
+    const userAId = await ensureUser(SUB_A, tokenA);
+    await ensureUser(SUB_B, tokenB);
     const cityId = await seedCity(userAId);
 
     // User B queries user A's city — should get empty array, not 404.

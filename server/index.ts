@@ -6,6 +6,7 @@ import { requireJwt } from './auth/jwt.js';
 import { lazyProvisionUser } from './auth/lazyProvision.js';
 import { meRouter } from './routes/me.js';
 import { citiesRouter } from './routes/cities.js';
+import { photosRouter, photosNestedRouter } from './routes/photos.js';
 // Side-effect import: registers the Hono ContextVariableMap
 // augmentation so c.set('user', row) is typed as User (not unknown)
 // across this process. Removing this import would silently relax
@@ -37,6 +38,15 @@ app.route('/api/me', meRouter);
 app.use('/api/cities', requireJwt, lazyProvisionUser);
 app.use('/api/cities/*', requireJwt, lazyProvisionUser);
 app.route('/api/cities', citiesRouter);
+
+app.use('/api/photos', requireJwt, lazyProvisionUser);
+app.use('/api/photos/*', requireJwt, lazyProvisionUser);
+// photosRouter handles POST /api/photos/:id/finalize and DELETE /api/photos/:id.
+app.route('/api/photos', photosRouter);
+// photosNestedRouter handles POST /api/cities/:cityId/photos/upload-url and GET /.
+// The /api/cities/* middleware above already covers this path with requireJwt +
+// lazyProvisionUser, so no additional app.use() is needed here.
+app.route('/api/cities/:cityId/photos', photosNestedRouter);
 
 serve(
   { fetch: app.fetch, port: env.PORT },

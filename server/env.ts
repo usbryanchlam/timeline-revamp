@@ -18,6 +18,15 @@ const envSchema = z.object({
   // `https://${AUTH0_DOMAIN}/` for the issuer claim and the JWKS URL.
   AUTH0_DOMAIN: z.string().min(1),
   AUTH0_AUDIENCE: z.string().url(),
+  // Phase 6: OCI Object Storage — optional so unit tests without OCI creds
+  // still boot. The route handlers throw on first PAR call if missing.
+  OCI_TENANCY_OCID: z.string().optional(),
+  OCI_USER_OCID: z.string().optional(),
+  OCI_FINGERPRINT: z.string().optional(),
+  OCI_PRIVATE_KEY_PATH: z.string().optional(),
+  OCI_REGION: z.string().optional(),
+  OCI_NAMESPACE: z.string().optional(),
+  OCI_BUCKET_NAME: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
