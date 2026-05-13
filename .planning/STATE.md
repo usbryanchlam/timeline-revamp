@@ -5,24 +5,24 @@
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 5 — City CRUD + map picker.
+**Current focus:** Phase 6 — Photo upload pipeline.
 
 ## Current Position
 
-Phase: **5 of 12** (City CRUD + map picker)
-Plan: 0 of N (not yet planned)
+Phase: **6 of 12** (Photo upload pipeline)
+Plan: 0 of 3 (not yet planned)
 Status: **Ready to plan**
-Last activity: 2026-05-09 — Phase 4 closed out. Two plans landed (04-01 backend skeleton, 04-02 Auth0 + lazy provisioning + handle picker). End-to-end Auth0 flow validated on browser: Universal Login → handle picker modal → /app/ reel with bottom nav. Three Auth0 dashboard landmines hit during testing (callback URL path mismatch, SPA-vs-API per-app authorization grant required, dual env var sets needed for Vite); all resolved and saved as feedback memory.
+Last activity: 2026-05-12 — Phase 5 closed out. Three plans landed (05-01 read-side + Trips map-pick, 05-02 write-side CRUD + CityForm, 05-03 reorder + REEL-09 grouping + /app/ reel switched to API data). Workflow shifted from `gsd-executor` to `superpowers:subagent-driven-development` (fresh implementer subagent per task with two-stage review). Two UAT bugs surfaced and fixed: CityForm Save spinner stuck under StrictMode (mountedRef pattern needed re-anchor on mount), and saved-city pin styling drifted from DESIGN.md (teardrop reverted to amber circle per single-accent rule). Three more latent bugs fixed pre-merge: `me.ts` 23505→409 path never fired under DrizzleQueryError wrapping (extracted `pgErrorCode()` helper handling both raw + wrapped shapes); useCitiesQuery had stale-response + unmount races (req-id guard); CityList had concurrent-drag stale-revert race (pendingRef gate).
 
-Progress: [████░░░░░░░░] 33% (4 of 12 phases complete)
+Progress: [█████░░░░░░░] 42% (5 of 12 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total phases completed: 4
-- Total plans completed: 12 (1 Phase 1, 6 Phase 2 incl. hotfix, 3 Phase 3, 2 Phase 4)
-- Average duration: ~5h30m per phase
-- Total execution time: ~22 hours
+- Total phases completed: 5
+- Total plans completed: 15 (1 Phase 1, 6 Phase 2 incl. hotfix, 3 Phase 3, 2 Phase 4, 3 Phase 5)
+- Average duration: ~5h45m per phase
+- Total execution time: ~30 hours
 
 **By Phase:**
 
@@ -32,12 +32,15 @@ Progress: [████░░░░░░░░] 33% (4 of 12 phases complete)
 | 2 (Reel polish + perf) | 6 | ~5h | ~50min | Parallel agent dispatch; one bug-chase iteration (lazy CSS) |
 | 3 (App shell) | 3 | ~5h | ~1h40 | Parallel wave 1 + solo wave 2; plan-checker caught 3 blockers pre-execution |
 | 4 (Backend + Auth0) | 2 | ~6h | ~3h | Sequential plans (04-02 depends on 04-01); plan-checker round 1 REVISE (DATA-02 brittle constraint approach + Tasks 5/6 ordering); 3 Auth0 dashboard landmines on first live test |
+| 5 (Cities CRUD + reorder + reel API) | 3 | ~8h | ~2h40 | `superpowers:subagent-driven-development` workflow: fresh implementer subagent per task with two-stage review (spec compliance → code quality) + fix subagent per Important issue. 52 new tests (88 → 140). 8+ review-fix commits caught real bugs pre-merge (Drizzle wrapping, StrictMode mountedRef, concurrent drag race, focus rings, tz drift). 1 mid-Task-2 stream timeout recovered cleanly via fresh-agent resume. DEFERRABLE constraint exercised end-to-end for the first time via two-row swap test |
 
 **Recent Trend:**
-- Plan quality improved phase-over-phase (Phase 3 + Phase 4 both had plan-checker REVISE rounds catching real issues pre-execution)
-- Phase 4 was the largest plan-line count yet (~1900 lines combined for 2 plans) — embedded code samples were load-bearing for first-time-backend territory; small incremental cleanup possible next time
-- Auth0 SPA dashboard config has more landmines than Regular Web Apps; saved feedback memory documents the four (callback path, per-app authorization, dual env vars, hosted-domain confusion)
-- Test count: 85 → 88 (Phase 4 added 3 jose-based JWT validation tests using in-memory keypair injection)
+- Subagent-driven-development with two-stage review caught more bugs pre-merge than gsd-executor's single-pass model (Phase 5: 5 distinct latent bugs surfaced by reviewers, all fixed before merge)
+- UAT still catches StrictMode-specific bugs (mountedRef pattern, MapPicker effect coordination) — review subagents miss these because they don't see runtime behavior
+- DEFERRABLE unique constraint from Phase 4 was real and load-bearing; the two-row swap test proves the constraint works under concurrent reorder
+- Drizzle's `DrizzleQueryError` wrapping silently breaks naïve `err.code === '23505'` checks — saved as project memory; future server code uses `pgErrorCode(err)` helper
+- Test count: 88 → 140 (52 new across Phase 5: 9 reorder + 9 groupChapters + 12 cityToChapter + 8 PATCH/DELETE + 7 POST + 6 GET + a handful of fix-related additions)
+- cities.test.ts hit 945 lines (past 800 ceiling) — flagged for split in Phase 6 housekeeping
 
 *Updated after each phase completion*
 
@@ -70,6 +73,20 @@ Decisions are logged in `.planning/PROJECT.md` Key Decisions table. Recent decis
 - **Phase 4**: `<AuthProvider>` mounts inside `AppLayout` (NOT `main.tsx` or `App.tsx`) — AUTH-04 grep-enforced: `@auth0/auth0-react` import is forbidden in public routes (`/`, `/u/:handle`, 404).
 - **Phase 4**: Handle picker is modal-based (`HandlePickerGate` + `HandlePickerModal`), not a separate route. Triggers when `users.handle IS NULL` after first authenticated `/api/me` call. Reserved-word list has 26 entries.
 - **Phase 4**: `.env.local` has dual sets of Auth0 keys — `AUTH0_*` (server reads) and `VITE_AUTH0_*` (frontend reads). Same values; SPAs ship client_id in JS bundles by design so duplicating it is not a secret leak.
+- **Phase 5**: `pgErrorCode(err)` helper at `server/db/pgError.ts` unwraps both raw pg `err.code` and Drizzle's `DrizzleQueryError.cause.code`. Required because Drizzle wraps pg errors and naïve `err.code === '23505'` never fires — caught a latent silent-500 on duplicate-handle POST in `me.ts`. Applied to all four route catch blocks (cities.ts GET/POST/PATCH/DELETE) and me.ts.
+- **Phase 5**: BigDataCloud reverse-geocoding is client-side only per Fair Use Policy. CI-enforced via `server/auth/__no-bigdatacloud.test.ts` meta-test (walks `server/**/*.ts` and fails the build if any file mentions the string). `__` prefix convention for project-invariant meta-tests.
+- **Phase 5**: `reorderSchema` Zod uses `.strict()` outer + `superRefine` for duplicate-id, duplicate-orderIndex, gap-detection. Pre-flight ownership AND completeness check runs OUTSIDE the transaction (body must include ALL user's cities, not a partial reorder).
+- **Phase 5**: `PATCH /api/cities/reorder` runs all UPDATEs inside `db.transaction(async (tx) => ...)` — first endpoint to exercise the DATA-02 DEFERRABLE constraint. Two-row swap test (cities 0,1 → 1,0) proves DEFERRABLE works end-to-end. Single `now = new Date()` shared across all rows in the batch.
+- **Phase 5**: Hono route ordering: `PATCH /reorder` MUST be registered BEFORE `PATCH /:id` (Hono matches in registration order — `/reorder` would otherwise be captured as an id param). Locked in by a regression-guard test asserting 200, not 422-from-updateCitySchema.
+- **Phase 5**: REEL-09 grouping: `groupChapters` pure function collapses ADJACENT (not global) cities with byte-equal `(lat, lng)` into one `ChapterGroup`. Exact equality, no tolerance. Photo cycling half of REEL-09 deferred to Phase 6+ (no photos yet). `groupsToChapters` helper encapsulates the `members[0]` projection so Phase 6 has one site to upgrade.
+- **Phase 5**: DnD library locked to `@dnd-kit/core + @dnd-kit/sortable + @dnd-kit/utilities`. Drag handle is a separate `<button aria-label="Reorder">` with `min-w-[44px]` — listeners applied only to the handle, NOT the whole row, so card-body taps still open the edit form. PointerSensor `activationConstraint: { distance: 4 }` prevents accidental drag on tap.
+- **Phase 5**: Optimistic-update mirror pattern: local `useState` order mirror + `useEffect` resync on cities prop change. On drag end: setOrder(newOrder) → PATCH → on failure throw to revert. `pendingRef` gate prevents concurrent-drag stale-snapshot revert.
+- **Phase 5**: MapPicker reactive marker sync via dual-effect pattern: init effect handles map+click+initial-fitBounds and sets `mapReadyTick`; sync effect with deps `[cities, mapReadyTick]` owns ALL city-marker rendering (tear-down + recreate). Cleanup explicitly disposes markers BEFORE `map.remove()` to prevent listener leaks.
+- **Phase 5**: `/app/` reel switched from `SEEDED_CITIES` to API data via `useCitiesQuery → groupChapters → groupsToChapters`. `Reel` + `ReducedMotionReel` gained `chapters?: readonly CityChapter[]` prop with `= SEEDED_CITIES` default — zero-arg public-route calls (`PublicReelRoute`, `HandleReelRoute`) still render seeded data unchanged. Phase 7 wires public routes to per-handle data.
+- **Phase 5**: `arrivedAt` date-input timezone anchor: client converts `"YYYY-MM-DD"` to `new Date(\`${ymd}T00:00:00\`).toISOString()` before POST/PATCH. Prevents day-shift for non-UTC users (Tokyo +9: saving "today" at 10pm local would otherwise round to UTC midnight → previous day).
+- **Phase 5**: `mountedRef` pattern under React 18 StrictMode requires re-anchor inside the effect body (`mountedRef.current = true; return () => { mountedRef.current = false }`). Without re-anchor, StrictMode's double-invoke leaves the ref stuck at false on the live remount and post-await guards all early-return — surfaces as Save button stuck on "Saving". Saved as project memory.
+- **Phase 5**: Saved-city pin = 12px amber circle with thin dark border + soft amber halo per DESIGN.md single-accent rule. Draft pin = 18px amber circle with double-stop halo (stronger glow). Teardrop SVG attempt (one commit) reverted — DESIGN.md mandates `border-radius: 50%` for map pins and amber as THE pin color.
+- **Phase 5**: Auth0 SDK `cacheLocation: 'memory'` kept as-is — re-login-on-reload is acceptable for the portfolio use case (users land once and scroll). Saved as 5th landmine in Auth0 SPA setup memory for future projects.
 
 ### Pending Todos
 
@@ -82,12 +99,21 @@ Decisions are logged in `.planning/PROJECT.md` Key Decisions table. Recent decis
 - **Manual theme toggle in v2** (logged in `.planning/TODOS.md` by 03-03).
 - **Future refactor (Phase 9):** extract `<ReelView />` shared between PublicReelRoute / HandleReelRoute / AppReelRoute — currently each branches `usePrefersReducedMotion()` independently.
 - **Phase 4 doc fix:** plan 04-02 told user to whitelist Allowed Callback URLs as origin-only (`http://localhost:5173`) but the SDK code sends `${origin}/app`. User had to extend the dashboard whitelist after first run. Worth a small follow-up to either patch the plan/SUMMARY or change the code's `redirect_uri` to be origin-only.
-- **Phase 5 prereq:** BigDataCloud reverse-geocoding API key (or chosen provider). Used for click-on-map → city-name lookup. Free tier check.
+- **Phase 5 carry-overs (housekeeping candidates for Phase 6 lead-in):**
+  - Split `server/routes/cities.test.ts` (945 lines, past 800 ceiling). Natural cuts: `cities.read.test.ts`, `cities.write.test.ts`, `cities.reorder.test.ts` + shared `cities.test.helpers.ts`.
+  - Move pre-flight ownership/completeness check INSIDE the `db.transaction` in PATCH /reorder — closes the narrow TOCTOU race where a concurrent DELETE could leave a gap in 0..n-1.
+  - Replace `mapReadyTick` side-effect counter in MapPicker with `useState(map)` so React re-renders on init naturally.
+  - Add keyed `Map<cityId, Marker>` diff in MapPicker so unchanged cities don't get torn down + recreated on every prop change. Defer until 100+ cities.
+  - Extract `formatArrived` from `CityList.tsx` + `ChapterOverlay.tsx` into `src/utils/formatDate.ts`.
+  - Deterministic `updatedAt` seed in PATCH-strictly-advances test (currently uses 50ms sleep; backdate seed to `Date.now() - 1000` for full determinism).
 
 ### Blockers/Concerns
 
 [Issues that affect future work]
 
+- **Phase 6 prereq**: OCI Object Storage bucket created + Pre-Authenticated Request (PAR) URL minting flow understood. Account ID, region, namespace, bucket name needed in `.env.local`.
+- **Phase 6 prereq**: HEIC → JPEG client-side library decision (`heic-to`, `libheif-js`, or browser-native `<input>` accept filter only?). Bundle-size impact on the public-routes-stay-tiny invariant must be considered (HEIC libs are 200+ KB; lazy-load behind `/app/` only).
+- **Phase 6 prereq**: thumbnail strategy — server-side via `sharp` (Hono runs on Bun; sharp works), or client-side double-upload? Affects server VM CPU sizing in Phase 8.
 - **Phase 8 prereq**: OCI Ampere A1 VM provisioning — confirm 2 OCPU / 8 GB sizing.
 - **Phase 8 prereq**: DNS for `timeline.bryanlam.dev` not yet pointed.
 
@@ -110,26 +136,38 @@ Items acknowledged and carried forward:
 | Photo gallery | Dedicated per-city gallery view | v2 | Phase 1 (planning) |
 | Per-reel poster generation | Server-side first-frame render at save time | Phase 9+ | Phase 2 (post-mortem) |
 | Manual theme toggle | UI control to override `prefers-color-scheme` | v2 | Phase 3 (03-03 planning) |
+| Country column | Persist reverse-geocoded country on cities row | v2 | Phase 5 (05-03 SUMMARY) |
+| REEL-09 photo cycling | Cycle through ChapterGroup.members' photos when chapters collapse | Phase 6+ | Phase 5 (05-03 — no photos yet) |
+| `mapReadyTick` refactor | Replace side-effect counter with `useState(map)` | Phase 6+ | Phase 5 (05-03 code review M4) |
+| MapPicker marker diffing | Keyed `Map<cityId, Marker>` instead of full tear-down | Phase 6+ | Phase 5 (05-03 code review I-4) |
 
 ## Session Continuity
 
-Last session: 2026-05-09
-Stopped at: Phase 4 fully shipped + verified end-to-end. `main` at `f86c4d2` (origin synced). Two plans landed (04-01 backend, 04-02 Auth0). 88/88 tests pass. Frontend + server typecheck green via shared `tsconfig.json` references. User completed live login flow on browser: Universal Login → handle picker modal (entered a handle) → /app/ reel renders with bottom nav. Lazy provisioning created `users` row keyed by Auth0 `sub` claim.
+Last session: 2026-05-12
+Stopped at: Phase 5 fully shipped + Phase 6 ready to plan. `main` at `a43aabc` (origin synced). Three plans landed (05-01 read-side, 05-02 write-side, 05-03 reorder + REEL-09 + reel switch). 140/140 tests pass. Frontend + server typecheck green. User completed live UAT on browser: full city CRUD + drag reorder + reel-on-API-data. Two UAT bugs surfaced and fixed (mountedRef StrictMode, pin design-doc compliance).
 
-**Next action**: Plan Phase 5 (City CRUD + map picker). 3+ plans expected. ROADMAP goal: user clicks on map → BigDataCloud reverse-geocodes lat/lng → form pre-fills city name → save creates `cities` row with `order_index = max(order_index) + 1` → drag-reorder triggers `PATCH /api/cities/reorder` in single transaction with the deferred-unique constraint → Trips view renders combined map (pins) + chronological list.
+**Next action**: Plan Phase 6 (Photo upload pipeline). ROADMAP goal: iPhone HEIC files converted to JPEG client-side, resized to 2048px max longest-edge, EXIF stripped, uploaded to OCI Object Storage via PAR, thumbnails generated server-side, photo detail sheet opens on overlay tap.
 
-Phase 5 is where the deferrable constraint from Phase 4 actually gets exercised. The `cities_user_id_order_index_unique` constraint is `DEFERRABLE INITIALLY DEFERRED` so a bulk reorder transaction can SET, swap, COMMIT without intermediate uniqueness violations. Plan 05-XX should cite DATA-02 OWNERSHIP NOTICE in `server/db/schema.ts` and walk through the transaction pattern explicitly.
+Phase 6 is where the cinematic surface gets its actual photos. REEL-09's "cycling photos" half — deferred from Phase 5 — gets implemented here once photos exist. The `ChapterGroup.members` array is already preserved on the type for that purpose; Phase 6 wires the cycling animation.
 
-Codebase map (`.planning/codebase/`) is now stale — Phase 4 added `server/` and `scripts/` directories not in the map. Worth a `/gsd-map-codebase` refresh before Phase 5 plans, OR have the planner cite the missing parts and accept the staleness for one more phase.
+Phase 6 also is where the existing public reel surface (`/`, `/u/:handle`) starts looking like a real product — Phase 7 will wire the per-handle data fetch, but Phase 6 photos will already render on `/app/` reels.
+
+Codebase map (`.planning/codebase/`) was refreshed before Phase 5 (2026-05-09). Phase 5 added: server validation/, db/pgError.ts, components/CityList.tsx, components/CityForm.tsx, reel/groupChapters.ts, geocode/bigdatacloud.ts, routes for AppReelRoute/TripsRoute. Worth a `/gsd-map-codebase` refresh before Phase 6 planning, OR have the planner cite the missing parts.
 
 ## Notable Artifacts
 
 - **Source-of-truth gstack docs** at `~/.gstack/projects/usbryanchlam-timeline-revamp/bryanlam-main-design-20260423-104825.md` (master plan) and `bryanlam-main-eng-review-test-plan-20260424-200544.md` (QA plan). Repo copies in `docs/plan.md` and `docs/test-plan.md` are snapshots; gstack remains primary.
-- **Design system** at `DESIGN.md` (repo root) — read before any UI change. Amber tokens at `DESIGN.md:85-87`; "public reel always dark" lock at `DESIGN.md:72`.
+- **Design system** at `DESIGN.md` (repo root) — read before any UI change. Amber tokens at `DESIGN.md:85-87`; "public reel always dark" lock at `DESIGN.md:72`; "map pin: `border-radius: 50%`" at `DESIGN.md:159`; "Active map pin: 16px circle with amber gradient + glow halo" at `DESIGN.md:230`.
 - **v2 backlog** at `TODOS.md` (repo root) and `.planning/TODOS.md` (Phase-3-internal toggles).
-- **Codebase map** at `.planning/codebase/` — STACK, INTEGRATIONS, ARCHITECTURE, STRUCTURE, CONVENTIONS, TESTING, CONCERNS. **Stale post-Phase-4** (backend added but not yet documented). Worth refreshing before Phase 5 planning OR citing the staleness in the plan prompt.
-- **`.env.local`** has 11 keys total: `VITE_MAPTILER_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `PORT`, `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_AUDIENCE`, `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`. All gitignored. Phase 5 will likely add a BigDataCloud API key.
-- **Phase memory feedback** saved to `~/.claude/projects/-Users-bryanlam-Workspaces-timeline-revamp/memory/`: post-merge `bun install`, hoist library CSS out of lazy chunks, verify dual-runtime env vars, Auth0 SPA setup landmines.
+- **Codebase map** at `.planning/codebase/` — STACK, INTEGRATIONS, ARCHITECTURE, STRUCTURE, CONVENTIONS, TESTING, CONCERNS. **Stale post-Phase-5** (cities CRUD endpoints, CityForm/CityList, groupChapters, MapPicker reactive sync, pgError helper, BigDataCloud meta-test all not yet documented). Worth refreshing before Phase 6 planning OR citing the staleness in the plan prompt.
+- **`.env.local`** has 11 keys total: `VITE_MAPTILER_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `PORT`, `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_AUDIENCE`, `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE`. All gitignored. Phase 6 will likely add OCI PAR credentials: `OCI_BUCKET_NAMESPACE`, `OCI_BUCKET_NAME`, `OCI_REGION`, and a PAR-creation credential (key file path or signing key).
+- **Phase memory feedback** saved to `~/.claude/projects/-Users-bryanlam-Workspaces-timeline-revamp/memory/`:
+  - `feedback_post_merge_install.md` — bun install after merging deps
+  - `feedback_lazy_chunk_css.md` — hoist library CSS out of lazy chunks
+  - `feedback_dual_runtime_env.md` — Vite VITE_-prefix vs server unprefixed
+  - `feedback_auth0_spa_setup.md` — 5 Auth0 SPA dashboard landmines
+  - `project_drizzle_pg_error_wrapping.md` — DrizzleQueryError wraps pg.code at err.cause.code
+  - `feedback_mountedref_strictmode.md` — useRef(true) + cleanup-only effect leaves ref stuck at false after StrictMode double-mount
 
 ---
-*Last updated: 2026-05-09 after Phase 4 closure (commit `f86c4d2`).*
+*Last updated: 2026-05-12 after Phase 5 closure (commit `a43aabc`).*
