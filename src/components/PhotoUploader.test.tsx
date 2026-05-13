@@ -81,7 +81,7 @@ describe('PhotoUploader', () => {
   it('when remainingCap <= 0, button is disabled AND shows limit microcopy', () => {
     render(<PhotoUploader cityId="city-1" remainingCap={0} onUploaded={vi.fn()} />);
     const button = screen.getByRole('button', { name: /add photos/i });
-    expect(button).toBeDisabled();
+    expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/you've reached the 10-photo limit for this city/i)).toBeTruthy();
   });
 

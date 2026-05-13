@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { listPhotos, requestUploadUrl, finalizePhoto, deletePhoto } from './photos.js';
 import type { useApi } from '@/auth/useApi';
 
