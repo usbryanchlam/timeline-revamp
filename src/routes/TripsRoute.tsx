@@ -13,14 +13,19 @@
 //
 // MapPicker now reactively syncs its city markers with the `cities` prop, so
 // post-save / post-reorder refetches reflect in the map without remount.
+//
+// 06-03: selectedCityId state drives the PhotoDetailSheet. Each city row in
+// the photos panel has a "Photos" button (amber ghost, ≥44px tap target).
+// The edit affordance (CityList onCardClick → CityForm) is unchanged.
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useApi } from '@/auth/useApi';
 import { useCitiesQuery } from '@/api/cities';
 import { reverseGeocode, type GeocodeResult } from '@/geocode/bigdatacloud';
 import { MapPicker } from '@/components/MapPicker';
 import { CityForm } from '@/components/CityForm';
 import { CityList } from '@/components/CityList';
+import { PhotoDetailSheet } from '@/components/PhotoDetailSheet';
 
 interface DraftPin {
   readonly lat: number;
@@ -34,8 +39,13 @@ export function TripsRoute() {
   const [geocoded, setGeocoded] = useState<GeocodeResult | null>(null);
   const [lookupPending, setLookupPending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedCityId, setSelectedCityId] = useState<string | null>(null);
 
   const editingCity = cities?.find((c) => c.id === editingId) ?? null;
+  const selectedCity = useMemo(
+    () => cities?.find((c) => c.id === selectedCityId) ?? null,
+    [cities, selectedCityId],
+  );
 
   const handlePick = useCallback((lat: number, lng: number) => {
     // Map pick wins over any open edit — close edit first.
@@ -166,6 +176,25 @@ export function TripsRoute() {
             onReorder={handleReorder}
           />
         )}
+
+        {/* Photos access row — one amber "Photos" button per city.
+            Rendered separately from CityList (Phase 5 scope) to avoid
+            touching that component. */}
+        {!isLoading && !error && cities && cities.length > 0 && (
+          <ul className="space-y-1 mt-2">
+            {cities.map((city) => (
+              <li key={city.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCityId(city.id)}
+                  className="w-full text-left text-amber-500 text-sm px-3 py-2 rounded-lg hover:bg-amber-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-w-[44px] min-h-[44px]"
+                >
+                  {city.name} — Photos
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {draftPin && !lookupPending && (
@@ -200,6 +229,13 @@ export function TripsRoute() {
           onCancel={closePanel}
           onSaved={handleSaved}
           onDeleted={handleDeleted}
+        />
+      )}
+
+      {selectedCity && (
+        <PhotoDetailSheet
+          city={selectedCity}
+          onClose={() => setSelectedCityId(null)}
         />
       )}
     </main>
