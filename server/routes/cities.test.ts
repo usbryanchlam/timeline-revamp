@@ -654,3 +654,292 @@ describe('DELETE /api/cities/:id (05-02 task 2)', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('PATCH /api/cities/reorder (05-03 task 1)', () => {
+  beforeEach(async () => {
+    await cleanup();
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  // Seed user A with `count` cities at orderIndex 0..count-1. Returns the
+  // seeded rows in seed order so tests can address them by index.
+  async function seedNCitiesForA(count: number): Promise<{
+    tokenA: string;
+    userAId: string;
+    seededIds: string[];
+  }> {
+    const tokenA = await mint({ sub: SUB_A, email: EMAIL_A });
+    // Provision A.
+    await buildApp().request('/api/cities', {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    const [userA] = await db.select().from(users).where(eq(users.auth0Sub, SUB_A));
+    if (!userA) throw new Error('test setup failed: user A missing');
+
+    const arrivedAt = new Date('2025-01-01T00:00:00Z');
+    const values = Array.from({ length: count }, (_, i) => ({
+      userId: userA.id,
+      orderIndex: i,
+      name: `City${i}`,
+      lat: 0,
+      lng: 0,
+      zoom: 12,
+      pitch: 50,
+      bearing: 0,
+      arrivedAt,
+    }));
+    const seeded = await db.insert(cities).values(values).returning();
+    return {
+      tokenA,
+      userAId: userA.id,
+      seededIds: seeded.map((r) => r.id),
+    };
+  }
+
+  it('happy path: reorders cities and follow-up GET returns new order', async () => {
+    const { tokenA, seededIds } = await seedNCitiesForA(3);
+    const [idA, idB, idC] = seededIds;
+
+    const app = buildApp();
+    const res = await app.request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          { id: idA, orderIndex: 2 },
+          { id: idB, orderIndex: 0 },
+          { id: idC, orderIndex: 1 },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean };
+    expect(body.ok).toBe(true);
+
+    const followup = await app.request('/api/cities', {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    expect(followup.status).toBe(200);
+    const rows = (await followup.json()) as { id: string; orderIndex: number }[];
+    // Server orders by orderIndex ASC: B(0), C(1), A(2).
+    expect(rows.map((r) => r.id)).toEqual([idB, idC, idA]);
+    expect(rows.map((r) => r.orderIndex)).toEqual([0, 1, 2]);
+  });
+
+  it('foreign id in body → 404 and BOTH users\' rows are unchanged (transaction rolled back)', async () => {
+    // Seed A with 2 cities.
+    const { tokenA, seededIds: aIds } = await seedNCitiesForA(2);
+    const [userARow] = await db.select().from(users).where(eq(users.auth0Sub, SUB_A));
+    if (!userARow) throw new Error('test setup failed: user A missing');
+
+    // Provision B and seed one city for B.
+    const tokenB = await mint({ sub: SUB_B, email: EMAIL_B });
+    await buildApp().request('/api/cities', {
+      headers: { authorization: `Bearer ${tokenB}` },
+    });
+    const [userB] = await db.select().from(users).where(eq(users.auth0Sub, SUB_B));
+    if (!userB) throw new Error('test setup failed: user B missing');
+    const [bCity] = await db.insert(cities).values({
+      userId: userB.id,
+      orderIndex: 0,
+      name: 'B-City',
+      lat: 0, lng: 0, zoom: 12, pitch: 50, bearing: 0,
+      arrivedAt: new Date('2025-01-01T00:00:00Z'),
+    }).returning();
+    if (!bCity) throw new Error('test setup failed: B city missing');
+
+    // Snapshot pre-state for both users.
+    const beforeA = await db.select().from(cities).where(eq(cities.userId, userARow.id));
+    const beforeB = await db.select().from(cities).where(eq(cities.id, bCity.id));
+
+    // User A sends a payload that includes user B's city id (replacing one
+    // of A's). The body still has 2 items (matching A's count) so we get
+    // past the size check and hit the foreign-id branch → 404.
+    const app = buildApp();
+    const res = await app.request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          { id: aIds[0], orderIndex: 0 },
+          { id: bCity.id, orderIndex: 1 },
+        ],
+      }),
+    });
+    expect(res.status).toBe(404);
+
+    // User B's row is unchanged.
+    const getB = await app.request(`/api/cities/${bCity.id}`, {
+      headers: { authorization: `Bearer ${tokenB}` },
+    });
+    expect(getB.status).toBe(200);
+    const bAfter = (await getB.json()) as { id: string; orderIndex: number; updatedAt: string };
+    expect(bAfter.orderIndex).toBe(0);
+    expect(new Date(bAfter.updatedAt).getTime()).toBe(beforeB[0]!.updatedAt.getTime());
+
+    // User A's rows are also unchanged — pre-flight returned 404 before
+    // db.transaction() ever opened. Verify by reading current state.
+    const getA = await app.request('/api/cities', {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    const aAfter = (await getA.json()) as { id: string; orderIndex: number }[];
+    const aAfterMap = new Map(aAfter.map((r) => [r.id, r.orderIndex]));
+    for (const row of beforeA) {
+      expect(aAfterMap.get(row.id)).toBe(row.orderIndex);
+    }
+  });
+
+  it('missing one of the user\'s cities → 422 must_include_all_cities', async () => {
+    const { tokenA, seededIds } = await seedNCitiesForA(3);
+    // Send only 2 of A's 3 cities.
+    const res = await buildApp().request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          { id: seededIds[0], orderIndex: 0 },
+          { id: seededIds[1], orderIndex: 1 },
+        ],
+      }),
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: string; reason?: string };
+    expect(body.error).toBe('invalid_input');
+    expect(body.reason).toBe('must_include_all_cities');
+  });
+
+  it('duplicate orderIndex in body → 422 (Zod superRefine)', async () => {
+    const { tokenA, seededIds } = await seedNCitiesForA(2);
+    const res = await buildApp().request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          { id: seededIds[0], orderIndex: 1 },
+          { id: seededIds[1], orderIndex: 1 },
+        ],
+      }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('duplicate id in body → 422 (Zod superRefine)', async () => {
+    const { tokenA, seededIds } = await seedNCitiesForA(3);
+    const res = await buildApp().request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          { id: seededIds[0], orderIndex: 0 },
+          { id: seededIds[0], orderIndex: 1 },
+          { id: seededIds[1], orderIndex: 2 },
+        ],
+      }),
+    });
+    expect(res.status).toBe(422);
+    const body = await res.json() as { error: string; issues: Array<{ message: string }> };
+    expect(body.error).toBe('invalid_input');
+    expect(body.issues.some((i) => i.message.includes('duplicate id'))).toBe(true);
+  });
+
+  it('gap in orderIndex set [0, 2, 3] → 422 (must be 0..n-1)', async () => {
+    const { tokenA, seededIds } = await seedNCitiesForA(3);
+    const res = await buildApp().request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          { id: seededIds[0], orderIndex: 0 },
+          { id: seededIds[1], orderIndex: 2 },
+          { id: seededIds[2], orderIndex: 3 },
+        ],
+      }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('two-row swap proves DEFERRABLE constraint (200, not 23505 mid-transaction)', async () => {
+    // Seed A,B at orderIndex 0,1. Swap to A:1, B:0.
+    //
+    // If the constraint were NOT deferrable, the first UPDATE (e.g.,
+    // A.orderIndex 0 → 1) would create two rows at orderIndex=1 (A and B)
+    // and Postgres would throw 23505 mid-transaction. DEFERRABLE INITIALLY
+    // DEFERRED defers the uniqueness check to COMMIT, when the final state
+    // is A:1, B:0 — no duplicates. A 200 response proves the constraint
+    // was checked at COMMIT, not after each UPDATE.
+    const { tokenA, seededIds } = await seedNCitiesForA(2);
+    const [idA, idB] = seededIds;
+
+    const app = buildApp();
+    const res = await app.request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          { id: idA, orderIndex: 1 },
+          { id: idB, orderIndex: 0 },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+
+    const followup = await app.request('/api/cities', {
+      headers: { authorization: `Bearer ${tokenA}` },
+    });
+    const rows = (await followup.json()) as { id: string; orderIndex: number }[];
+    // After swap: B at 0, A at 1.
+    expect(rows.map((r) => r.id)).toEqual([idB, idA]);
+  });
+
+  it('returns 401 with no Authorization header', async () => {
+    const res = await buildApp().request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ items: [] }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('routes /reorder before /:id (regression guard)', async () => {
+    // If /reorder were accidentally captured by /:id, this body would be
+    // parsed by updateCitySchema (which is .strict()) and rejected as
+    // invalid_input (items is not an allowed key), returning 422 from the
+    // wrong handler. A 200 response proves /reorder matched first.
+    const { tokenA, seededIds } = await seedNCitiesForA(1);
+    const res = await buildApp().request('/api/cities/reorder', {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${tokenA}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [{ id: seededIds[0], orderIndex: 0 }],
+      }),
+    });
+    expect(res.status).toBe(200);
+  });
+});

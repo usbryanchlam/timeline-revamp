@@ -3,7 +3,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { cities } from '../db/schema.js';
 import { pgErrorCode } from '../db/pgError.js';
-import { createCitySchema, updateCitySchema } from '../validation/cityInput.js';
+import { createCitySchema, updateCitySchema, reorderSchema } from '../validation/cityInput.js';
 
 // /api/cities sub-router. Mounted in server/index.ts behind the
 // requireJwt + lazyProvisionUser middleware chain, so c.var.user is
@@ -107,6 +107,62 @@ citiesRouter.post('/', async (c) => {
     if (pgErrorCode(err) === '23505') return c.json({ error: 'conflict_retry' }, 409);
     throw err;
   }
+});
+
+// ORDERING: PATCH /reorder MUST be registered BEFORE PATCH /:id below.
+// Hono matches routes in registration order — if /:id came first, the
+// literal "reorder" would be interpreted as an id param.
+//
+// PATCH /api/cities/reorder — atomically renumber order_index across the
+// requester's cities. Body shape: { items: [{ id, orderIndex }, ...] }.
+//
+// Pre-flight (outside the transaction): verify every supplied id belongs
+// to the requester AND that the payload covers ALL of the user's cities.
+// Cross-user id → 404; partial payload → 422 must_include_all_cities.
+//
+// Transaction: db.transaction(...) opens BEGIN, runs each UPDATE through
+// `tx`, and COMMITs on resolve / ROLLBACKs on throw. The deferrable
+// UNIQUE (user_id, order_index) constraint (server/db/migrations/
+// 0001_cities_deferrable_unique.sql) is checked exactly once, at COMMIT —
+// intermediate states with duplicate order_index values are tolerated, so
+// a two-row swap (A:0,B:1 → A:1,B:0) does NOT trip 23505 mid-transaction.
+citiesRouter.patch('/reorder', async (c) => {
+  const me = c.var.user;
+  const raw = await c.req.json().catch(() => null);
+  const parsed = reorderSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: 'invalid_input', issues: parsed.error.issues }, 422);
+  }
+
+  // Pre-flight: confirm every id belongs to this user, AND that the body
+  // covers ALL of the user's cities. Outside the transaction so the
+  // failure path stays cheap.
+  const owned = await db.select({ id: cities.id }).from(cities)
+    .where(eq(cities.userId, me.id));
+  const ownedIds = new Set(owned.map((r) => r.id));
+
+  for (const it of parsed.data.items) {
+    if (!ownedIds.has(it.id)) return c.json({ error: 'not_found' }, 404);
+  }
+  if (parsed.data.items.length !== ownedIds.size) {
+    return c.json({ error: 'invalid_input', reason: 'must_include_all_cities' }, 422);
+  }
+
+  // The transaction. db.transaction() opens BEGIN; runs the callback;
+  // COMMITs on resolve, ROLLBACKs on throw. The DEFERRABLE unique
+  // constraint on (user_id, order_index) is checked exactly once, at
+  // COMMIT — intermediate states with duplicate index values are tolerated.
+  // One timestamp for the whole batch — easier to diff "what changed in this reorder."
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    for (const it of parsed.data.items) {
+      await tx.update(cities)
+        .set({ orderIndex: it.orderIndex, updatedAt: now })
+        .where(and(eq(cities.id, it.id), eq(cities.userId, me.id)));
+    }
+  });
+
+  return c.json({ ok: true });
 });
 
 // PATCH /api/cities/:id — partial update of a city owned by the requester.

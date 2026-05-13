@@ -1,26 +1,26 @@
 // TripsRoute — authenticated /app/trips view.
 //
 // Composition: top-half MapPicker, bottom-half cities list, plus a transient
-// CityForm modal/sheet for create-or-edit. 05-02 task 3 replaces the
-// previous DraftPinPanel placeholder with the real Zod-validated form
-// (POST/PATCH/DELETE /api/cities).
+// CityForm modal/sheet for create-or-edit. 05-02 task 3 replaced the previous
+// DraftPinPanel placeholder with the real Zod-validated form (POST/PATCH/
+// DELETE /api/cities). 05-03 task 3 introduces drag-and-drop reorder via the
+// CityList component (PATCH /api/cities/reorder).
 //
 // Mutual-exclusion rule: at most one of { draftPin, editingId } is set at a
 // time. Picking on the map clears any open edit; clicking a CityCard or its
 // map marker clears any draft pin. This guarantees CityForm renders exactly
 // one mode at a time.
 //
-// Reactive marker sync on MapPicker is still deferred (see SUMMARY) — after
-// save we refetch the cities list, but the map markers reflect the snapshot
-// captured at MapPicker mount. 05-03 (reorder) will need to revisit this and
-// is the natural place to introduce live marker sync.
+// MapPicker now reactively syncs its city markers with the `cities` prop, so
+// post-save / post-reorder refetches reflect in the map without remount.
 
 import { useCallback, useState } from 'react';
+import { useApi } from '@/auth/useApi';
 import { useCitiesQuery } from '@/api/cities';
 import { reverseGeocode, type GeocodeResult } from '@/geocode/bigdatacloud';
 import { MapPicker } from '@/components/MapPicker';
 import { CityForm } from '@/components/CityForm';
-import type { CityDTO } from '@/types/city';
+import { CityList } from '@/components/CityList';
 
 interface DraftPin {
   readonly lat: number;
@@ -28,6 +28,7 @@ interface DraftPin {
 }
 
 export function TripsRoute() {
+  const api = useApi();
   const { data: cities, error, refetch } = useCitiesQuery();
   const [draftPin, setDraftPin] = useState<DraftPin | null>(null);
   const [geocoded, setGeocoded] = useState<GeocodeResult | null>(null);
@@ -71,6 +72,25 @@ export function TripsRoute() {
     closePanel();
     void refetch();
   }, [closePanel, refetch]);
+
+  const handleReorder = useCallback(
+    async (orderedIds: readonly string[]) => {
+      const items = orderedIds.map((id, idx) => ({ id, orderIndex: idx }));
+      const res = await api('/api/cities/reorder', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
+      if (!res.ok) {
+        // Refetch first so the mirror in CityList resyncs to authoritative
+        // server state when it reverts on the thrown error.
+        await refetch();
+        throw new Error(`Reorder failed: ${res.status}`);
+      }
+      await refetch();
+    },
+    [api, refetch],
+  );
 
   const isLoading = cities === undefined && !error;
   const empty = cities !== undefined && cities.length === 0;
@@ -140,15 +160,11 @@ export function TripsRoute() {
         )}
 
         {!isLoading && !error && cities && cities.length > 0 && (
-          <ul className="space-y-3">
-            {cities.map((city) => (
-              <CityCard
-                key={city.id}
-                city={city}
-                onClick={() => handleCityClick(city.id)}
-              />
-            ))}
-          </ul>
+          <CityList
+            cities={cities}
+            onCardClick={handleCityClick}
+            onReorder={handleReorder}
+          />
         )}
       </div>
 
@@ -190,40 +206,3 @@ export function TripsRoute() {
   );
 }
 
-// CityCard stays inline (extraction is a Phase 6 follow-up flagged in 05-01).
-function CityCard({
-  city,
-  onClick,
-}: {
-  readonly city: CityDTO;
-  readonly onClick: () => void;
-}) {
-  const arrived = formatArrived(city.arrivedAt);
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onClick}
-        className="w-full text-left rounded-lg bg-bg-elev border border-line p-3 hover:border-amber-500/40 transition-colors"
-      >
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-ink font-semibold truncate">{city.name}</span>
-          <span className="text-ink-mute text-xs whitespace-nowrap">{arrived}</span>
-        </div>
-        {city.caption && (
-          <p className="mt-1 text-ink-dim text-sm line-clamp-2">{city.caption}</p>
-        )}
-      </button>
-    </li>
-  );
-}
-
-function formatArrived(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
