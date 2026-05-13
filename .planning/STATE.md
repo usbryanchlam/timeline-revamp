@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
 status: executing
-stopped_at: "Wave 1 of Phase 6 shipped in parallel via dispatching-parallel-agents skill: 06-01 (client image pipeline — heicToJpeg + canvasResize + uploadQueue, 19 new tests) + 06-02 (server PAR + sharp thumbnail + photos table delta + MIME sniff, 19 new tests, migration applied to live DB). 178/178 tests pass; typecheck clean. 6 atomic commits (3 per plan) on main. 06-02 agent's stream was killed by the watchdog AFTER all work shipped + SUMMARY.md written — disk + git verified, no rework needed. Ready for Wave 2 (06-03 UI: PhotoUploader + PhotoDetailSheet + PhotoViewer + per-photo delete)."
-last_updated: "2026-05-12T23:05:00.000Z"
-last_activity: 2026-05-12 -- Wave 1 complete (06-01 + 06-02 shipped in parallel)
+stopped_at: "Wave 2 (06-03) shipped: PhotoGrid + PhotoUploader + PhotoDetailSheet + PhotoViewer + per-photo delete + Trips route wiring. 214/214 tests pass. Typecheck clean. 4 atomic commits on main. Per-plan SUMMARY at .planning/phases/06-photo-upload-pipeline/06-03-SUMMARY.md. Ready for 06-04 (reel photo cycling)."
+last_updated: "2026-05-13T21:03:00.000Z"
+last_activity: 2026-05-13 -- 06-03 UI complete (PhotoUploader + PhotoDetailSheet + PhotoViewer + per-photo delete)
 progress:
   total_phases: 12
   completed_phases: 3
@@ -26,9 +26,9 @@ See: `.planning/PROJECT.md` (updated 2026-04-27)
 ## Current Position
 
 Phase: 6 (photo-upload-pipeline) — EXECUTING
-Plan: 2 of 4 complete (06-01 + 06-02 shipped in parallel; Wave 1 done)
-Status: Wave 1 ✓ (178/178 tests; typecheck clean). Wave 2 next = 06-03 (UI: uploader + sheet + viewer + per-photo delete).
-Last activity: 2026-05-12 -- Wave 1 complete (06-01 + 06-02 shipped in parallel via dispatching-parallel-agents)
+Plan: 3 of 4 complete (06-01 + 06-02 Wave 1 + 06-03 Wave 2 done)
+Status: Wave 2 ✓ (214/214 tests; typecheck clean). Wave 3 next = 06-04 (reel photo cycling + ChapterGroup.members wiring).
+Last activity: 2026-05-13 -- 06-03 shipped (PhotoGrid + PhotoUploader + PhotoDetailSheet + PhotoViewer + per-photo delete)
 
 Progress: [█████░░░░░░░] 42% (5 of 12 phases complete)
 
@@ -105,6 +105,10 @@ Decisions are logged in `.planning/PROJECT.md` Key Decisions table. Recent decis
 - **Phase 5**: `mountedRef` pattern under React 18 StrictMode requires re-anchor inside the effect body (`mountedRef.current = true; return () => { mountedRef.current = false }`). Without re-anchor, StrictMode's double-invoke leaves the ref stuck at false on the live remount and post-await guards all early-return — surfaces as Save button stuck on "Saving". Saved as project memory.
 - **Phase 5**: Saved-city pin = 12px amber circle with thin dark border + soft amber halo per DESIGN.md single-accent rule. Draft pin = 18px amber circle with double-stop halo (stronger glow). Teardrop SVG attempt (one commit) reverted — DESIGN.md mandates `border-radius: 50%` for map pins and amber as THE pin color.
 - **Phase 5**: Auth0 SDK `cacheLocation: 'memory'` kept as-is — re-login-on-reload is acceptable for the portfolio use case (users land once and scroll). Saved as 5th landmine in Auth0 SPA setup memory for future projects.
+- **Phase 6 (06-03)**: `@testing-library/react` + `jsdom` installed as dev deps — plan stated "already installed" but project had none. Per-file `// @vitest-environment jsdom` annotation used (not global) because `jose` library's Uint8Array coercion fails in jsdom environment. Server tests stay in node.
+- **Phase 6 (06-03)**: Photos trigger in TripsRoute rendered as separate per-city amber ghost button list below CityList (not via CityList prop) — CityList.tsx is Phase 5 scope, read-only for this plan.
+- **Phase 6 (06-03)**: PhotoViewer created during Task 3 (PhotoDetailSheet dependency) rather than waiting for Task 4 — avoids two-pass build failure without changing the commit ownership (Task 4 commits the file).
+- **Phase 6 (06-03)**: Caption is read-only in both PhotoDetailSheet and PhotoViewer per CONTEXT.md deferred_ideas. Per-photo delete is LOCKED (implemented). Full-screen viewer is LOCKED (implemented).
 
 ### Pending Todos
 
