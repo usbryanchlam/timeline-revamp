@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// NOTE: heic-to is mocked ONLY in specific tests that exercise the WASM fallback.
+// NOTE: heic-to is mocked ONLY in specific tests that exercise the WASM fallback
+// or the convertHeicToJpeg path.
 // Extension fast-path tests do NOT mock heic-to — proving no WASM loads for .jpg/.png.
+// We use vi.doMock (not vi.mock) so mocks are per-test and not hoisted globally.
 
 describe('detectIsHeic', () => {
   beforeEach(() => {
@@ -52,31 +54,31 @@ describe('detectIsHeic', () => {
   });
 
   it('falls back to WASM isHeic for ambiguous application/octet-stream (Safari)', async () => {
-    vi.mock('heic-to', () => ({
-      default: {
-        isHeic: vi.fn().mockResolvedValue(true),
-        heicTo: vi.fn(),
-      },
+    // Use vi.doMock so the factory runs at call-time (not hoisted)
+    vi.doMock('heic-to', () => ({
       isHeic: vi.fn().mockResolvedValue(true),
       heicTo: vi.fn(),
     }));
-    // Reset module so the cache is fresh and uses the mock
+    // Reset modules so heicToJpeg.ts re-imports the mocked heic-to
     vi.resetModules();
     const { detectIsHeic } = await import('./heicToJpeg.js');
     const file = new File([new Uint8Array(8)], 'unknown_file', { type: 'application/octet-stream' });
     const result = await detectIsHeic(file);
     expect(result).toBe(true);
+    vi.doUnmock('heic-to');
   });
 });
 
 describe('convertHeicToJpeg', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.restoreAllMocks();
+  });
+
   it('calls heicTo with correct args and returns a Blob', async () => {
     const expectedBlob = new Blob(['jpeg-data'], { type: 'image/jpeg' });
-    vi.mock('heic-to', () => ({
-      default: {
-        isHeic: vi.fn(),
-        heicTo: vi.fn().mockResolvedValue(expectedBlob),
-      },
+    // Use vi.doMock so factory runs at call-time and can reference expectedBlob
+    vi.doMock('heic-to', () => ({
       isHeic: vi.fn(),
       heicTo: vi.fn().mockResolvedValue(expectedBlob),
     }));
@@ -86,5 +88,6 @@ describe('convertHeicToJpeg', () => {
     const result = await convertHeicToJpeg(file);
     expect(result).toBe(expectedBlob);
     expect(result.type).toBe('image/jpeg');
+    vi.doUnmock('heic-to');
   });
 });

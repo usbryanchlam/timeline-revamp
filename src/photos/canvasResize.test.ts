@@ -7,27 +7,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 let capturedCanvasWidth = 0;
 let capturedCanvasHeight = 0;
-let toBloBMock: ReturnType<typeof vi.fn>;
+let revokeObjectUrlMock: ReturnType<typeof vi.fn>;
 
 function setupDomMocks(imgWidth: number, imgHeight: number) {
-  // Stub URL object-URL helpers
-  vi.stubGlobal('URL', {
-    createObjectURL: vi.fn().mockReturnValue('blob:mock-url'),
-    revokeObjectURL: vi.fn(),
-  });
+  capturedCanvasWidth = 0;
+  capturedCanvasHeight = 0;
 
-  toBloBMock = vi.fn().mockImplementation(function (
-    this: HTMLCanvasElement,
-    cb: (b: Blob | null) => void,
-    _type: string,
-    _quality: number,
-  ) {
-    capturedCanvasWidth = this.width;
-    capturedCanvasHeight = this.height;
-    cb(new Blob(['x'], { type: 'image/jpeg' }));
-  });
+  // Stub URL static methods — preserve URL class itself (Node has a real URL)
+  revokeObjectUrlMock = vi.fn();
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url');
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(revokeObjectUrlMock);
 
-  // Stub document.createElement to return a minimal canvas object
+  // Stub document.createElement to return a minimal canvas stub
   vi.stubGlobal('document', {
     createElement: vi.fn().mockImplementation((tag: string) => {
       if (tag === 'canvas') {
@@ -37,7 +28,16 @@ function setupDomMocks(imgWidth: number, imgHeight: number) {
           getContext: vi.fn().mockReturnValue({
             drawImage: vi.fn(),
           }),
-          toBlob: toBloBMock,
+          toBlob: vi.fn().mockImplementation(function (
+            this: { width: number; height: number },
+            cb: (b: Blob | null) => void,
+            _type: string,
+            _quality: number,
+          ) {
+            capturedCanvasWidth = this.width;
+            capturedCanvasHeight = this.height;
+            cb(new Blob(['x'], { type: 'image/jpeg' }));
+          }),
         };
         return canvas;
       }
@@ -45,34 +45,42 @@ function setupDomMocks(imgWidth: number, imgHeight: number) {
     }),
   });
 
-  // Stub the Image constructor
-  const MockImage = vi.fn().mockImplementation(() => {
-    const img: Record<string, unknown> = {};
-    // When src is set, trigger onload asynchronously
-    let _src = '';
-    Object.defineProperty(img, 'src', {
-      set(_val: string) {
-        _src = _val;
-        // Use setTimeout to simulate async image load
-        setTimeout(() => {
-          if (typeof (img as { onload?: () => void }).onload === 'function') {
-            (img as { onload: () => void }).onload();
-          }
-        }, 0);
-      },
-      get() { return _src; },
-    });
-    Object.defineProperty(img, 'naturalWidth', { value: imgWidth, writable: false });
-    Object.defineProperty(img, 'naturalHeight', { value: imgHeight, writable: false });
-    return img;
+  // Stub the Image global with a proper constructor function (not arrow fn)
+  // so that `new Image()` works. naturalWidth/naturalHeight are read-only
+  // on real HTMLImageElement but here we use a plain object.
+  function MockImageConstructor(this: {
+    onload: (() => void) | null;
+    onerror: (() => void) | null;
+    naturalWidth: number;
+    naturalHeight: number;
+    src: string;
+  }) {
+    this.onload = null;
+    this.onerror = null;
+    this.naturalWidth = imgWidth;
+    this.naturalHeight = imgHeight;
+    this.src = '';
+  }
+
+  // Override the src setter to trigger onload asynchronously
+  Object.defineProperty(MockImageConstructor.prototype, 'src', {
+    set(this: { onload: (() => void) | null; _src: string }, _val: string) {
+      this._src = _val;
+      setTimeout(() => {
+        if (typeof this.onload === 'function') this.onload();
+      }, 0);
+    },
+    get(this: { _src: string }) {
+      return this._src ?? '';
+    },
+    configurable: true,
   });
-  vi.stubGlobal('Image', MockImage);
+
+  vi.stubGlobal('Image', MockImageConstructor);
 }
 
 describe('resizeAndStrip', () => {
   beforeEach(() => {
-    capturedCanvasWidth = 0;
-    capturedCanvasHeight = 0;
     vi.resetModules();
   });
 
@@ -124,7 +132,6 @@ describe('resizeAndStrip', () => {
     const { resizeAndStrip } = await import('./canvasResize.js');
     const blob = new Blob(['data'], { type: 'image/jpeg' });
     await resizeAndStrip(blob);
-    expect((URL as unknown as { revokeObjectURL: ReturnType<typeof vi.fn> }).revokeObjectURL)
-      .toHaveBeenCalledWith('blob:mock-url');
+    expect(revokeObjectUrlMock).toHaveBeenCalledWith('blob:mock-url');
   });
 });
