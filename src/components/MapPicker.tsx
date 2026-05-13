@@ -33,14 +33,7 @@ interface MarkerInstance {
   readonly remove: () => void;
 }
 interface MarkerCtor {
-  new (opts: {
-    element: HTMLElement;
-    // 'bottom' anchors the marker's tip to the coordinate (used by the
-    // teardrop saved-city pin). Default is 'center' (used by the draft dot).
-    anchor?:
-      | 'center' | 'top' | 'bottom' | 'left' | 'right'
-      | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-  }): MarkerInstance;
+  new (opts: { element: HTMLElement }): MarkerInstance;
 }
 interface MaplibreModule {
   readonly Map: new (opts: {
@@ -195,17 +188,13 @@ export function MapPicker({ cities, draftPin, onPick, onCityClick }: MapPickerPr
     // don't need to re-bind on every render.
     for (const city of cities) {
       const el = document.createElement('div');
-      // Teardrop pin. Dark navy fill + light stroke reads on any underlying
-      // tile color; the tail tip is anchored to the exact coordinate via
-      // Marker({ anchor: 'bottom' }). Draft pin (amber dot) stays a flat
-      // disc so the in-progress state visually outranks settled cities.
-      el.style.cssText = 'width:20px;height:28px;cursor:pointer;line-height:0;';
-      el.innerHTML =
-        '<svg width="20" height="28" viewBox="0 0 20 28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-        '<path d="M10 0C4.5 0 0 4.5 0 10c0 7.5 10 18 10 18s10-10.5 10-18C20 4.5 15.5 0 10 0z" fill="#0A0E1A" stroke="#E6EAF2" stroke-width="1.5"/>' +
-        '<circle cx="10" cy="10" r="3.5" fill="#E6EAF2"/>' +
-        '</svg>';
-      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      // Saved-city pin per DESIGN.md: amber circle (single-accent rule),
+      // 12px with a thin ink-dark border for definition on light tiles plus
+      // a soft amber halo for lift on dark tiles. The draft pin uses the
+      // same amber but at a larger size + stronger halo so the in-progress
+      // marker visually outranks settled cities during the create flow.
+      el.style.cssText = `width:12px;height:12px;border-radius:9999px;background:${AMBER_500};border:2px solid #0A0E1A;box-shadow:0 0 0 4px rgba(255,212,112,0.18);cursor:pointer;`;
+      const marker = new maplibregl.Marker({ element: el })
         .setLngLat([city.lng, city.lat])
         .addTo(map);
       el.addEventListener('click', (ev) => {
@@ -229,7 +218,7 @@ export function MapPicker({ cities, draftPin, onPick, onCityClick }: MapPickerPr
     if (!draftPin) return;
 
     const el = document.createElement('div');
-    el.style.cssText = `width:18px;height:18px;border-radius:9999px;background:${AMBER_500};border:3px solid #0A0E1A;box-shadow:0 0 0 2px ${AMBER_500}55;`;
+    el.style.cssText = `width:18px;height:18px;border-radius:9999px;background:${AMBER_500};border:3px solid #0A0E1A;box-shadow:0 0 0 6px rgba(255,212,112,0.28), 0 0 0 14px rgba(255,212,112,0.10);`;
     const marker = new maplibregl.Marker({ element: el })
       .setLngLat([draftPin.lng, draftPin.lat])
       .addTo(map);
