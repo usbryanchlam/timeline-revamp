@@ -121,12 +121,27 @@ Plans:
   3. Upload posts to OCI via PAR; thumbnail generated server-side.
   4. Per-city limit: 10 photos, 5 MB each enforced both client and server.
   5. Photo detail sheet opens on overlay tap and displays full-size with caption.
-**Plans**: 3 plans (TBD)
+**Plans**: 4 plans (planned 2026-05-12)
 
 Plans:
+
+**Wave 1**
 - [ ] 06-01: HEIC convert + resize + EXIF strip on client
-- [ ] 06-02: OCI PAR upload + thumbnail pipeline
-- [ ] 06-03: Photo detail sheet UI
+- [ ] 06-02: OCI PAR upload + thumbnail pipeline (server, sharp on Bun)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 06-03: Photo detail sheet UI + multi-select uploader + full-screen viewer + per-photo delete
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 06-04: REEL-09 photo cycling on /app/ reel
+
+**Cross-cutting constraints:**
+- Single amber accent (DESIGN.md) — pins, focus rings, progress bars, CTAs
+- StrictMode-safe `mountedRef` pattern in every component with async work (memory: feedback_mountedref_strictmode.md)
+- `pgErrorCode(err)` helper in every server-side catch (Drizzle wraps pg errors)
+- Hono route ordering: literal routes before parameterized routes (regression test mirror from cities.ts /reorder)
+- `prefers-reduced-motion` honored in any cycling/transition (PhotoCycle, PhotoViewer)
+- Server-side MIME byte-sniff at finalize (no trust in client-declared contentType)
 
 ### Phase 7: Public URLs + handle reservation
 **Goal**: `/u/:handle` works unauthenticated; users without a handle pick one on first authenticated visit; reserved words blocked; uniqueness enforced.

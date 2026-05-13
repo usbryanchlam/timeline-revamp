@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0.0
+milestone_name: milestone
+status: ready_to_execute
+stopped_at: "Phase 6 planned: 4 plans verified by gsd-plan-checker (round 2 PASSED after one revision round resolved 4 blockers: full-screen viewer + per-photo delete UI added to 06-03, server MIME byte-sniff added to 06-02, 06-04 wave + depends_on corrected). RESEARCH.md + PATTERNS.md + VALIDATION.md (nyquist_compliant: true) all in place. Ready for /gsd-execute-phase 6 — wave 1 (06-01 client pipeline + 06-02 server PAR/sharp can run in parallel), wave 2 (06-03 UI), wave 3 (06-04 reel cycling)."
+last_updated: "2026-05-13T05:00:00.000Z"
+last_activity: 2026-05-13 -- Phase 6 plans verified and ready to execute
+progress:
+  total_phases: 12
+  completed_phases: 3
+  total_plans: 17
+  completed_plans: 8
+  percent: 47
+---
+
 # Project State
 
 ## Project Reference
@@ -5,20 +21,21 @@
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 6 — Photo upload pipeline.
+**Current focus:** Phase 6 — photo-upload-pipeline
 
 ## Current Position
 
-Phase: **6 of 12** (Photo upload pipeline)
-Plan: 0 of 3 (not yet planned)
-Status: **Ready to plan**
-Last activity: 2026-05-12 — Phase 5 closed out. Three plans landed (05-01 read-side + Trips map-pick, 05-02 write-side CRUD + CityForm, 05-03 reorder + REEL-09 grouping + /app/ reel switched to API data). Workflow shifted from `gsd-executor` to `superpowers:subagent-driven-development` (fresh implementer subagent per task with two-stage review). Two UAT bugs surfaced and fixed: CityForm Save spinner stuck under StrictMode (mountedRef pattern needed re-anchor on mount), and saved-city pin styling drifted from DESIGN.md (teardrop reverted to amber circle per single-accent rule). Three more latent bugs fixed pre-merge: `me.ts` 23505→409 path never fired under DrizzleQueryError wrapping (extracted `pgErrorCode()` helper handling both raw + wrapped shapes); useCitiesQuery had stale-response + unmount races (req-id guard); CityList had concurrent-drag stale-revert race (pendingRef gate).
+Phase: 6 (photo-upload-pipeline) — READY TO EXECUTE
+Plan: 0 of 4
+Status: Plans verified (round 2 PASSED); awaiting /gsd-execute-phase 6
+Last activity: 2026-05-13 -- Phase 6 plans verified and ready to execute
 
 Progress: [█████░░░░░░░] 42% (5 of 12 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total phases completed: 5
 - Total plans completed: 15 (1 Phase 1, 6 Phase 2 incl. hotfix, 3 Phase 3, 2 Phase 4, 3 Phase 5)
 - Average duration: ~5h45m per phase
@@ -35,6 +52,7 @@ Progress: [█████░░░░░░░] 42% (5 of 12 phases complete)
 | 5 (Cities CRUD + reorder + reel API) | 3 | ~8h | ~2h40 | `superpowers:subagent-driven-development` workflow: fresh implementer subagent per task with two-stage review (spec compliance → code quality) + fix subagent per Important issue. 52 new tests (88 → 140). 8+ review-fix commits caught real bugs pre-merge (Drizzle wrapping, StrictMode mountedRef, concurrent drag race, focus rings, tz drift). 1 mid-Task-2 stream timeout recovered cleanly via fresh-agent resume. DEFERRABLE constraint exercised end-to-end for the first time via two-row swap test |
 
 **Recent Trend:**
+
 - Subagent-driven-development with two-stage review caught more bugs pre-merge than gsd-executor's single-pass model (Phase 5: 5 distinct latent bugs surfaced by reviewers, all fixed before merge)
 - UAT still catches StrictMode-specific bugs (mountedRef pattern, MapPicker effect coordination) — review subagents miss these because they don't see runtime behavior
 - DEFERRABLE unique constraint from Phase 4 was real and load-bearing; the two-row swap test proves the constraint works under concurrent reorder
