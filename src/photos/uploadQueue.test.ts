@@ -86,7 +86,8 @@ describe('createUploadQueue', () => {
     await new Promise((r) => setTimeout(r, 20));
 
     // Item should be in failed state after the first runOne throws
-    const failedUpdate = updates.findLast((u) => u.id === id);
+    const matchingUpdates = updates.filter((u) => u.id === id);
+    const failedUpdate = matchingUpdates[matchingUpdates.length - 1];
     expect(failedUpdate?.status.kind).toBe('failed');
 
     // Retry
@@ -124,62 +125,76 @@ describe('xhrUpload', () => {
     vi.resetModules();
   });
 
-  function makeMockXhr(opts: {
+  /**
+   * Build a proper XHR mock class. Using `class` so that `new XMLHttpRequest()`
+   * works correctly in node environment (arrow/plain fn implementations aren't
+   * valid constructors per vitest's mock validation).
+   */
+  function buildXhrClass(opts: {
     progressEvents?: Array<{ loaded: number; total: number }>;
     status?: number;
     triggerError?: boolean;
     triggerAbort?: boolean;
   }) {
-    const events: Record<string, ((e: ProgressEvent) => void) | (() => void)> = {};
-    const status = opts.status ?? 200;
+    const progressEvents = opts.progressEvents ?? [];
+    const xhrStatus = opts.status ?? 200;
+    const { triggerError = false, triggerAbort = false } = opts;
 
-    const xhr = {
-      open: vi.fn(),
-      setRequestHeader: vi.fn(),
-      abort: vi.fn(),
-      status,
-      onload: null as ((e: Event) => void) | null,
-      onerror: null as ((e: Event) => void) | null,
-      onabort: null as ((e: Event) => void) | null,
-      upload: {
-        addEventListener: vi.fn((eventName: string, handler: (e: ProgressEvent) => void) => {
-          events[`upload_${eventName}`] = handler;
-        }),
-      },
-      send: vi.fn().mockImplementation((_blob: Blob) => {
-        // Emit progress events synchronously
-        for (const pe of (opts.progressEvents ?? [])) {
-          const handler = events['upload_progress'] as ((e: ProgressEvent) => void) | undefined;
-          if (handler) {
-            handler({ lengthComputable: true, loaded: pe.loaded, total: pe.total } as ProgressEvent);
+    class MockXHR {
+      status = xhrStatus;
+      onload: ((e: Event) => void) | null = null;
+      onerror: ((e: Event) => void) | null = null;
+      onabort: ((e: Event) => void) | null = null;
+
+      private progressHandler: ((e: ProgressEvent) => void) | undefined;
+
+      upload = {
+        addEventListener: (eventName: string, handler: (e: ProgressEvent) => void) => {
+          if (eventName === 'progress') {
+            this.progressHandler = handler;
+          }
+        },
+      };
+
+      open = vi.fn();
+      setRequestHeader = vi.fn();
+      abort = vi.fn();
+
+      send = (_blob: Blob) => {
+        // Emit progress events synchronously before load/error
+        for (const pe of progressEvents) {
+          if (this.progressHandler) {
+            this.progressHandler({
+              lengthComputable: true,
+              loaded: pe.loaded,
+              total: pe.total,
+            } as ProgressEvent);
           }
         }
-        // Trigger completion
-        if (opts.triggerError) {
-          if (typeof xhr.onerror === 'function') xhr.onerror(new Event('error'));
-        } else if (opts.triggerAbort) {
-          if (typeof xhr.onabort === 'function') xhr.onabort(new Event('abort'));
+        // Trigger completion callback
+        if (triggerError) {
+          this.onerror?.(new Event('error'));
+        } else if (triggerAbort) {
+          this.onabort?.(new Event('abort'));
         } else {
-          if (typeof xhr.onload === 'function') xhr.onload(new Event('load'));
+          this.onload?.(new Event('load'));
         }
-      }),
-    };
+      };
+    }
 
-    return xhr;
+    return MockXHR;
   }
 
   it('reports progress: 0.5 and 1.0 callbacks during a mocked upload', async () => {
     const { xhrUpload } = await import('./uploadQueue.js');
 
-    vi.stubGlobal('XMLHttpRequest', vi.fn().mockImplementation(() =>
-      makeMockXhr({
-        progressEvents: [
-          { loaded: 500, total: 1000 },
-          { loaded: 1000, total: 1000 },
-        ],
-        status: 200,
-      }),
-    ));
+    vi.stubGlobal('XMLHttpRequest', buildXhrClass({
+      progressEvents: [
+        { loaded: 500, total: 1000 },
+        { loaded: 1000, total: 1000 },
+      ],
+      status: 200,
+    }));
 
     const progressValues: number[] = [];
     await xhrUpload({
@@ -196,9 +211,7 @@ describe('xhrUpload', () => {
   it('rejects on xhr.status 500 with "HTTP 500" message', async () => {
     const { xhrUpload } = await import('./uploadQueue.js');
 
-    vi.stubGlobal('XMLHttpRequest', vi.fn().mockImplementation(() =>
-      makeMockXhr({ status: 500 }),
-    ));
+    vi.stubGlobal('XMLHttpRequest', buildXhrClass({ status: 500 }));
 
     await expect(
       xhrUpload({
@@ -213,9 +226,7 @@ describe('xhrUpload', () => {
   it('rejects with "Network error" on xhr onerror', async () => {
     const { xhrUpload } = await import('./uploadQueue.js');
 
-    vi.stubGlobal('XMLHttpRequest', vi.fn().mockImplementation(() =>
-      makeMockXhr({ triggerError: true }),
-    ));
+    vi.stubGlobal('XMLHttpRequest', buildXhrClass({ triggerError: true }));
 
     await expect(
       xhrUpload({

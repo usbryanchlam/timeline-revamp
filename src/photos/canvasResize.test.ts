@@ -7,16 +7,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 let capturedCanvasWidth = 0;
 let capturedCanvasHeight = 0;
-let revokeObjectUrlMock: ReturnType<typeof vi.fn>;
+const revokedUrls: string[] = [];
 
 function setupDomMocks(imgWidth: number, imgHeight: number) {
   capturedCanvasWidth = 0;
   capturedCanvasHeight = 0;
+  revokedUrls.length = 0;
 
   // Stub URL static methods — preserve URL class itself (Node has a real URL)
-  revokeObjectUrlMock = vi.fn();
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url');
-  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(revokeObjectUrlMock);
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation((url: string) => { revokedUrls.push(url); });
 
   // Stub document.createElement to return a minimal canvas stub
   vi.stubGlobal('document', {
@@ -132,6 +132,6 @@ describe('resizeAndStrip', () => {
     const { resizeAndStrip } = await import('./canvasResize.js');
     const blob = new Blob(['data'], { type: 'image/jpeg' });
     await resizeAndStrip(blob);
-    expect(revokeObjectUrlMock).toHaveBeenCalledWith('blob:mock-url');
+    expect(revokedUrls).toContain('blob:mock-url');
   });
 });
