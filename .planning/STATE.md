@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: ready_to_execute
-stopped_at: "Phase 6 planned: 4 plans verified by gsd-plan-checker (round 2 PASSED after one revision round resolved 4 blockers: full-screen viewer + per-photo delete UI added to 06-03, server MIME byte-sniff added to 06-02, 06-04 wave + depends_on corrected). RESEARCH.md + PATTERNS.md + VALIDATION.md (nyquist_compliant: true) all in place. Ready for /gsd-execute-phase 6 — wave 1 (06-01 client pipeline + 06-02 server PAR/sharp can run in parallel), wave 2 (06-03 UI), wave 3 (06-04 reel cycling)."
-last_updated: "2026-05-13T05:00:00.000Z"
-last_activity: 2026-05-13 -- Phase 6 plans verified and ready to execute
+status: executing
+stopped_at: "Wave 1 of Phase 6 shipped in parallel via dispatching-parallel-agents skill: 06-01 (client image pipeline — heicToJpeg + canvasResize + uploadQueue, 19 new tests) + 06-02 (server PAR + sharp thumbnail + photos table delta + MIME sniff, 19 new tests, migration applied to live DB). 178/178 tests pass; typecheck clean. 6 atomic commits (3 per plan) on main. 06-02 agent's stream was killed by the watchdog AFTER all work shipped + SUMMARY.md written — disk + git verified, no rework needed. Ready for Wave 2 (06-03 UI: PhotoUploader + PhotoDetailSheet + PhotoViewer + per-photo delete)."
+last_updated: "2026-05-12T23:05:00.000Z"
+last_activity: 2026-05-12 -- Wave 1 complete (06-01 + 06-02 shipped in parallel)
 progress:
   total_phases: 12
   completed_phases: 3
   total_plans: 17
-  completed_plans: 8
-  percent: 47
+  completed_plans: 10
+  percent: 59
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 ## Current Position
 
-Phase: 6 (photo-upload-pipeline) — READY TO EXECUTE
-Plan: 0 of 4
-Status: Plans verified (round 2 PASSED); awaiting /gsd-execute-phase 6
-Last activity: 2026-05-13 -- Phase 6 plans verified and ready to execute
+Phase: 6 (photo-upload-pipeline) — EXECUTING
+Plan: 2 of 4 complete (06-01 + 06-02 shipped in parallel; Wave 1 done)
+Status: Wave 1 ✓ (178/178 tests; typecheck clean). Wave 2 next = 06-03 (UI: uploader + sheet + viewer + per-photo delete).
+Last activity: 2026-05-12 -- Wave 1 complete (06-01 + 06-02 shipped in parallel via dispatching-parallel-agents)
 
 Progress: [█████░░░░░░░] 42% (5 of 12 phases complete)
 
@@ -162,7 +162,7 @@ Items acknowledged and carried forward:
 ## Session Continuity
 
 Last session: 2026-05-12
-Stopped at: Phase 5 fully shipped + Phase 6 ready to plan. `main` at `a43aabc` (origin synced). Three plans landed (05-01 read-side, 05-02 write-side, 05-03 reorder + REEL-09 + reel switch). 140/140 tests pass. Frontend + server typecheck green. User completed live UAT on browser: full city CRUD + drag reorder + reel-on-API-data. Two UAT bugs surfaced and fixed (mountedRef StrictMode, pin design-doc compliance).
+Stopped at: Phase 6 plan 06-02 complete. Commits: ca8051e (task 1), 1b7ac6b (task 2), b463c7b (task 3). All 178 tests pass. Typecheck clean. Live DB migrated to photos_v2 schema. `main` at `a43aabc` (origin synced). Three plans landed (05-01 read-side, 05-02 write-side, 05-03 reorder + REEL-09 + reel switch). 140/140 tests pass. Frontend + server typecheck green. User completed live UAT on browser: full city CRUD + drag reorder + reel-on-API-data. Two UAT bugs surfaced and fixed (mountedRef StrictMode, pin design-doc compliance).
 
 **Next action**: Plan Phase 6 (Photo upload pipeline). ROADMAP goal: iPhone HEIC files converted to JPEG client-side, resized to 2048px max longest-edge, EXIF stripped, uploaded to OCI Object Storage via PAR, thumbnails generated server-side, photo detail sheet opens on overlay tap.
 
