@@ -52,3 +52,6 @@ progress*.md
 
 # Git worktrees (superpowers skill)
 .worktrees/
+
+# Local dev TLS certs from mkcert (machine + LAN-specific; never commit)
+.dev/certs/
