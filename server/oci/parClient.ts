@@ -1,5 +1,13 @@
 import { readFileSync } from 'fs';
+import { createRequire } from 'node:module';
 import { env } from '../env.js';
+
+// Bridge for CJS-only OCI SDK packages. The server runs as ESM (tsx watch)
+// where bare `require` is undefined. We can't use top-level `import` because
+// loading the OCI SDK touches its native auth provider at module-eval time
+// and trips tests that don't have OCI env vars. createRequire keeps the
+// lazy/sync semantics buildRealClient relies on.
+const cjsRequire = createRequire(import.meta.url);
 
 // Dynamic import of sharp to avoid loading the native binary at module
 // evaluation time in test environments where it may not be needed.
@@ -40,13 +48,11 @@ export function __setOciClientForTest(mock: OciClient): void {
 let realClient: OciClient | null = null;
 
 function buildRealClient(): OciClient {
-  // Dynamic import at module evaluation would crash in test environments.
-  // We import synchronously here because buildRealClient is only called
-  // when real OCI credentials are present (production or smoke test).
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const objectStorage = require('oci-objectstorage') as typeof import('oci-objectstorage');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const common = require('oci-common') as typeof import('oci-common');
+  // Synchronous CJS load via createRequire (server is ESM; bare require is
+  // undefined here). Only called when real OCI credentials are present —
+  // tests inject a mock via __setOciClientForTest before this ever runs.
+  const objectStorage = cjsRequire('oci-objectstorage') as typeof import('oci-objectstorage');
+  const common = cjsRequire('oci-common') as typeof import('oci-common');
 
   const tenancy = env.OCI_TENANCY_OCID!;
   const user = env.OCI_USER_OCID!;
