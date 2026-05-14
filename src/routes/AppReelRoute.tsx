@@ -1,6 +1,8 @@
 import { Link } from 'react-router';
 import { useCitiesQuery } from '@/api/cities';
-import { groupChapters, groupsToChapters } from '@/reel/groupChapters';
+import { groupChapters } from '@/reel/groupChapters';
+import { chaptersWithPhotos } from '@/reel/chaptersWithPhotos';
+import { useAllPhotos } from '@/hooks/useAllPhotos';
 import { Reel } from '@/reel/Reel';
 import { ReducedMotionReel } from '@/reel/ReducedMotionReel';
 import { usePrefersReducedMotion } from '@/reel/usePrefersReducedMotion';
@@ -14,6 +16,11 @@ import { usePrefersReducedMotion } from '@/reel/usePrefersReducedMotion';
 // Public routes (`/`, `/u/:handle`) remain on SEEDED_CITIES — both Reel and
 // ReducedMotionReel accept an optional `chapters` prop and fall back to the
 // seeded data when no prop is passed.
+//
+// Phase 6 / REEL-09: useAllPhotos fans out GET /api/cities/:id/photos for
+// each city. chaptersWithPhotos merges the photo map into the chapter pipeline
+// produced by groupChapters. The reel doesn't jolt on photo arrival — chapter
+// layout is fixed; the photo cycle appears in the stack slot once data lands.
 export function AppReelRoute() {
   const reduced = usePrefersReducedMotion();
   const { data: cities, error, refetch } = useCitiesQuery();
@@ -60,12 +67,29 @@ export function AppReelRoute() {
     );
   }
 
-  // REEL-09: collapse adjacent identical-coord cities into one chapter group
-  // BEFORE mapping to CityChapter. For Phase 5 we project each group to its
-  // first member; the group's `members` array is preserved on ChapterGroup
-  // for Phase 6+ photo cycling (Reel.tsx can read it then).
+  // REEL-09: collapse adjacent identical-coord cities into one chapter group.
+  // Adjacent-dedup from groupChapters is preserved — chaptersWithPhotos cycles
+  // photos WITHIN a single ChapterGroup, never across group boundaries.
   // NOTE: country renders blank for /app/-reel chapters — see groupChapters.ts v1 limitation.
-  const chapters = groupsToChapters(groupChapters(cities));
+  return <AppReelContent cities={cities} reduced={reduced} />;
+}
+
+// Extracted inner component so hooks (useAllPhotos) are always called at the
+// top level of a component that's always rendered (not conditionally inside a
+// branch). React rules-of-hooks: hooks must not be called after early returns.
+function AppReelContent({
+  cities,
+  reduced,
+}: {
+  readonly cities: NonNullable<ReturnType<typeof useCitiesQuery>['data']>;
+  readonly reduced: boolean;
+}) {
+  // Phase 6 / REEL-09: real photos cycle within each chapter.
+  // photosByCityId resolves to an empty Map on first render; chapters
+  // render with empty photos until the fan-out resolves.
+  const photosByCityId = useAllPhotos(cities);
+  const groups = groupChapters(cities);
+  const chapters = chaptersWithPhotos(groups, photosByCityId);
 
   return (
     <div className="app-reel-host">

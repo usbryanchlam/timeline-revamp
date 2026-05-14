@@ -4,6 +4,8 @@ import {
   photoStackContainer,
   photoStackItem,
 } from '@/motion/variants';
+import { isPhotoCard } from '@/types/reel';
+import { PhotoCycle } from '@/reel/PhotoCycle';
 import type { CityChapter } from '@/types/reel';
 
 interface Props {
@@ -20,6 +22,11 @@ interface Props {
  * The overlay is keyed on `chapter.id` upstream so React replaces the DOM on
  * each chapter change — that re-mount restarts the Framer variants from
  * "hidden" → "visible", which is the trigger for the staggered arrival.
+ *
+ * Phase 6 / REEL-09: branches on ReelPhoto type —
+ * - PhotoCard[] from /app/ reel: rendered via PhotoCycle (crossfade cycling)
+ * - PhotoSeed[] from public seeded reel: rendered as gradient stack (existing behavior)
+ * - 0 photos: entire photo stack div is omitted (no broken img tags)
  */
 export function ChapterOverlay({ chapter, chapterNumber, totalChapters }: Props) {
   const formatted = formatArrivedAt(chapter.arrivedAt);
@@ -35,28 +42,50 @@ export function ChapterOverlay({ chapter, chapterNumber, totalChapters }: Props)
           paddingBottom: 'calc(max(env(safe-area-inset-bottom), 32px) + 48px)',
         }}
       >
-        {/* Photo stack — two cards rotated for editorial polaroid feel.
-            Framer drives the staggered arrival via the parent container variant. */}
-        <motion.div
-          className="relative h-32 mb-5 ml-1"
-          variants={photoStackContainer}
-          initial="hidden"
-          animate="visible"
-        >
-          {chapter.photos.slice(0, 2).map((photo, i) => (
+        {/* Photo stack — Framer drives the staggered arrival via the parent
+            container variant. PhotoCycle handles within-chapter crossfade. */}
+        {chapter.photos.length > 0 && (() => {
+          const first = chapter.photos[0]!;
+          if (isPhotoCard(first)) {
+            // /app/ reel: real PhotoCard array — cycle through them.
+            return (
+              <motion.div
+                className="relative h-32 mb-5 ml-1"
+                variants={photoStackContainer}
+                initial="hidden"
+                animate="visible"
+              >
+                <PhotoCycle photos={chapter.photos.filter(isPhotoCard)} />
+              </motion.div>
+            );
+          }
+          // Fallback to gradient seed render (existing behavior for public reel).
+          return (
             <motion.div
-              key={photo.id}
-              className="absolute top-0 left-0 w-24 h-32 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
-              variants={photoStackItem}
-              style={{
-                background: `linear-gradient(135deg, ${photo.gradient[0]} 0%, ${photo.gradient[1]} 100%)`,
-                transform: `translateX(${i * 22}px) rotate(${i === 0 ? -4 : 6}deg)`,
-              }}
-              role="img"
-              aria-label={photo.alt}
-            />
-          ))}
-        </motion.div>
+              className="relative h-32 mb-5 ml-1"
+              variants={photoStackContainer}
+              initial="hidden"
+              animate="visible"
+            >
+              {chapter.photos.slice(0, 2).map((photo, i) => {
+                if (isPhotoCard(photo)) return null; // narrow for TS
+                return (
+                  <motion.div
+                    key={photo.id}
+                    className="absolute top-0 left-0 w-24 h-32 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
+                    variants={photoStackItem}
+                    style={{
+                      background: `linear-gradient(135deg, ${photo.gradient[0]} 0%, ${photo.gradient[1]} 100%)`,
+                      transform: `translateX(${i * 22}px) rotate(${i === 0 ? -4 : 6}deg)`,
+                    }}
+                    role="img"
+                    aria-label={photo.alt}
+                  />
+                );
+              })}
+            </motion.div>
+          );
+        })()}
 
         {/* Chapter counter + date */}
         <div className="text-caps text-[10px] text-amber-400 mb-2">

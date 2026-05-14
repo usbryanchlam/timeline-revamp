@@ -1,4 +1,5 @@
 import { SEEDED_CITIES } from '@/data/seeded-cities';
+import { isPhotoCard } from '@/types/reel';
 import type { CityChapter } from '@/types/reel';
 
 interface ReducedMotionReelProps {
@@ -9,6 +10,12 @@ interface ReducedMotionReelProps {
  * Static fallback for `prefers-reduced-motion: reduce`. No map, no animation,
  * native scroll. Same data, Lighthouse-clean. This is a launch-gate path
  * (a11y audit verifies it works keyboard-only and reads cleanly in VoiceOver).
+ *
+ * Phase 6 / REEL-09: branches on ReelPhoto type —
+ * - PhotoCard[] from /app/ reel: rendered as static grid <img> elements
+ *   (first photo is sufficient per REEL-09 spec; all are shown for accessibility)
+ * - PhotoSeed[] from public seeded reel: gradient divs (existing behavior)
+ * - 0 photos: no photo grid rendered (no empty-state illustration per DESIGN.md)
  */
 export function ReducedMotionReel({
   chapters = SEEDED_CITIES,
@@ -45,19 +52,36 @@ export function ReducedMotionReel({
               </span>
             </h2>
             <p className="mt-2 text-ink-dim text-[15px] leading-snug">{c.caption}</p>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {c.photos.map((p) => (
-                <div
-                  key={p.id}
-                  className="aspect-[4/5] rounded-lg"
-                  style={{
-                    background: `linear-gradient(135deg, ${p.gradient[0]} 0%, ${p.gradient[1]} 100%)`,
-                  }}
-                  role="img"
-                  aria-label={p.alt}
-                />
-              ))}
-            </div>
+            {c.photos.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {c.photos.map((p) => {
+                  if (isPhotoCard(p)) {
+                    // Real photo from /app/ reel — static <img>, no cycling.
+                    return (
+                      <img
+                        key={p.id}
+                        src={p.thumbUrl}
+                        alt={p.alt}
+                        className="aspect-[4/5] rounded-lg object-cover w-full"
+                        loading="lazy"
+                      />
+                    );
+                  }
+                  // Gradient seed from public seeded reel (existing behavior).
+                  return (
+                    <div
+                      key={p.id}
+                      className="aspect-[4/5] rounded-lg"
+                      style={{
+                        background: `linear-gradient(135deg, ${p.gradient[0]} 0%, ${p.gradient[1]} 100%)`,
+                      }}
+                      role="img"
+                      aria-label={p.alt}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </li>
         ))}
       </ol>
