@@ -1,9 +1,27 @@
 export type Coordinates = readonly [longitude: number, latitude: number];
 
+/** Public seeded reel — gradient placeholder. */
 export interface PhotoSeed {
   readonly id: string;
   readonly gradient: readonly [string, string];
   readonly alt: string;
+}
+
+/** Real user photo from /api/cities/:id/photos (Phase 6). */
+export interface PhotoCard {
+  readonly id: string;
+  readonly masterUrl: string;     // OCI public URL (DATA-07)
+  readonly thumbUrl: string;      // OCI public URL — placeholder while master loads
+  readonly alt: string;           // empty string '' when no caption (A11Y-05)
+  readonly orderIndex: number;
+}
+
+/** Union: chapters from /app/ have PhotoCard[], chapters from / and /u/:handle have PhotoSeed[]. */
+export type ReelPhoto = PhotoSeed | PhotoCard;
+
+/** Type-guard used by ChapterOverlay + ReducedMotionReel to branch. */
+export function isPhotoCard(p: ReelPhoto): p is PhotoCard {
+  return 'masterUrl' in p;
 }
 
 export interface CityChapter {
@@ -16,7 +34,7 @@ export interface CityChapter {
   readonly bearing: number;
   readonly arrivedAt: string;
   readonly caption: string;
-  readonly photos: readonly PhotoSeed[];
+  readonly photos: readonly ReelPhoto[];
 }
 
 export type ReelStateName =
