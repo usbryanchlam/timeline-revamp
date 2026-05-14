@@ -43,9 +43,10 @@ interface CityListProps {
   readonly cities: readonly CityDTO[];
   readonly onCardClick: (id: string) => void;
   readonly onReorder: (orderedIds: readonly string[]) => Promise<void>;
+  readonly onPhotosClick?: (id: string) => void;
 }
 
-export function CityList({ cities, onCardClick, onReorder }: CityListProps) {
+export function CityList({ cities, onCardClick, onReorder, onPhotosClick }: CityListProps) {
   const [order, setOrder] = useState<readonly string[]>(() =>
     cities.map((c) => c.id),
   );
@@ -117,6 +118,7 @@ export function CityList({ cities, onCardClick, onReorder }: CityListProps) {
                 key={id}
                 city={city}
                 onCardClick={onCardClick}
+                onPhotosClick={onPhotosClick}
               />
             );
           })}
@@ -129,9 +131,10 @@ export function CityList({ cities, onCardClick, onReorder }: CityListProps) {
 interface SortableCityRowProps {
   readonly city: CityDTO;
   readonly onCardClick: (id: string) => void;
+  readonly onPhotosClick?: (id: string) => void;
 }
 
-function SortableCityRow({ city, onCardClick }: SortableCityRowProps) {
+function SortableCityRow({ city, onCardClick, onPhotosClick }: SortableCityRowProps) {
   const {
     attributes,
     listeners,
@@ -169,6 +172,19 @@ function SortableCityRow({ city, onCardClick }: SortableCityRowProps) {
             </p>
           )}
         </button>
+        {onPhotosClick && (
+          <button
+            type="button"
+            aria-label={`View photos for ${city.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPhotosClick(city.id);
+            }}
+            className="px-3 flex items-center justify-center text-amber-500 hover:bg-amber-500/10 min-w-[44px] min-h-[44px] text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-elev"
+          >
+            Photos
+          </button>
+        )}
         <button
           type="button"
           aria-label="Reorder"

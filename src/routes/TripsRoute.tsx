@@ -174,26 +174,8 @@ export function TripsRoute() {
             cities={cities}
             onCardClick={handleCityClick}
             onReorder={handleReorder}
+            onPhotosClick={(id) => setSelectedCityId(id)}
           />
-        )}
-
-        {/* Photos access row — one amber "Photos" button per city.
-            Rendered separately from CityList (Phase 5 scope) to avoid
-            touching that component. */}
-        {!isLoading && !error && cities && cities.length > 0 && (
-          <ul className="space-y-1 mt-2">
-            {cities.map((city) => (
-              <li key={city.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCityId(city.id)}
-                  className="w-full text-left text-amber-500 text-sm px-3 py-2 rounded-lg hover:bg-amber-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 min-w-[44px] min-h-[44px]"
-                >
-                  {city.name} — Photos
-                </button>
-              </li>
-            ))}
-          </ul>
         )}
       </div>
 
