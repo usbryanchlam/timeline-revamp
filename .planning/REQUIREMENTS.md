@@ -17,7 +17,7 @@ Requirements for v1 launch. Each maps to roadmap phases.
 - [ ] **REEL-06**: MapTiler vector tiles wired; zooms restored to 12-13 with cinematic city-block landings.
 - [ ] **REEL-07**: Camera arrival pulse animation fires on chapter land using `cubic-bezier(0.16, 1, 0.3, 1)`.
 - [ ] **REEL-08**: Single-city reel renders an 8s orbit at zoom 14 / pitch 60 (no inter-city flyTo).
-- [ ] **REEL-09**: Two adjacent chapters with identical coordinates collapse to one chapter group with cycling photos.
+- [x] **REEL-09**: Two adjacent chapters with identical coordinates collapse to one chapter group with cycling photos.
 
 ### A11Y — Accessibility
 
@@ -144,7 +144,7 @@ Mapping of requirements to roadmap phases. Updated as `ROADMAP.md` evolves.
 | REEL-06 | Phase 2 (W2) | Pending |
 | REEL-07 | Phase 2 (W2) | Pending |
 | REEL-08 | Phase 7 (W7) | Pending |
-| REEL-09 | Phase 5 (W5) | Pending |
+| REEL-09 | Phase 6 (W6) | ✓ Done |
 | A11Y-01..08 | Phase 11 (W11) | Pending |
 | PERF-01..05 | Phase 2 (W2) | Pending |
 | APP-01..03 | Phase 3 (W3) | Pending |
