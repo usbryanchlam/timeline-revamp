@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
 status: executing
-stopped_at: "Wave 2 (06-03) shipped: PhotoGrid + PhotoUploader + PhotoDetailSheet + PhotoViewer + per-photo delete + Trips route wiring. 214/214 tests pass. Typecheck clean. 4 atomic commits on main. Per-plan SUMMARY at .planning/phases/06-photo-upload-pipeline/06-03-SUMMARY.md. Ready for 06-04 (reel photo cycling)."
-last_updated: "2026-05-13T21:03:00.000Z"
-last_activity: 2026-05-13 -- 06-03 UI complete (PhotoUploader + PhotoDetailSheet + PhotoViewer + per-photo delete)
+stopped_at: "Wave 3 (06-04) shipped: PhotoCard type + chaptersWithPhotos + PhotoCycle + useAllPhotos + ChapterOverlay + ReducedMotionReel + AppReelRoute wired. REEL-09 closed. 235/235 tests pass. Typecheck clean. 4 atomic commits on main. Per-plan SUMMARY at .planning/phases/06-photo-upload-pipeline/06-04-SUMMARY.md. Phase 6 complete."
+last_updated: "2026-05-14T05:25:00.000Z"
+last_activity: 2026-05-14 -- 06-04 REEL-09 photo cycling complete (chaptersWithPhotos + PhotoCycle + useAllPhotos wired)
 progress:
   total_phases: 12
-  completed_phases: 3
+  completed_phases: 6
   total_plans: 17
-  completed_plans: 10
-  percent: 59
+  completed_plans: 11
+  percent: 65
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: `.planning/PROJECT.md` (updated 2026-04-27)
 ## Current Position
 
 Phase: 6 (photo-upload-pipeline) — EXECUTING
-Plan: 3 of 4 complete (06-01 + 06-02 Wave 1 + 06-03 Wave 2 done)
-Status: Wave 2 ✓ (214/214 tests; typecheck clean). Wave 3 next = 06-04 (reel photo cycling + ChapterGroup.members wiring).
-Last activity: 2026-05-13 -- 06-03 shipped (PhotoGrid + PhotoUploader + PhotoDetailSheet + PhotoViewer + per-photo delete)
+Plan: 4 of 4 complete (06-01 + 06-02 + 06-03 + 06-04 all done)
+Status: Wave 3 ✓ (235/235 tests; typecheck clean). Phase 6 complete. REEL-09 closed.
+Last activity: 2026-05-14 -- 06-04 shipped (chaptersWithPhotos + PhotoCycle + useAllPhotos + ChapterOverlay + ReducedMotionReel wired)
 
 Progress: [█████░░░░░░░] 42% (5 of 12 phases complete)
 
@@ -109,6 +109,7 @@ Decisions are logged in `.planning/PROJECT.md` Key Decisions table. Recent decis
 - **Phase 6 (06-03)**: Photos trigger in TripsRoute rendered as separate per-city amber ghost button list below CityList (not via CityList prop) — CityList.tsx is Phase 5 scope, read-only for this plan.
 - **Phase 6 (06-03)**: PhotoViewer created during Task 3 (PhotoDetailSheet dependency) rather than waiting for Task 4 — avoids two-pass build failure without changing the commit ownership (Task 4 commits the file).
 - **Phase 6 (06-03)**: Caption is read-only in both PhotoDetailSheet and PhotoViewer per CONTEXT.md deferred_ideas. Per-photo delete is LOCKED (implemented). Full-screen viewer is LOCKED (implemented).
+- **Phase 6 (06-04)**: Hidden aria-hidden img used for single-next preload (not `<link rel="preload">`) — jsdom does not add `<link>` in body to queryable DOM. AppReelContent inner component extracted to satisfy rules-of-hooks (useAllPhotos must not be called after early returns). Cycle interval: 4s per orchestrator spec (CONTEXT.md originally said 2.5s — discrepancy flagged in SUMMARY for real-device QA tuning). REEL-09 closed.
 
 ### Pending Todos
 
@@ -192,4 +193,4 @@ Codebase map (`.planning/codebase/`) was refreshed before Phase 5 (2026-05-09). 
   - `feedback_mountedref_strictmode.md` — useRef(true) + cleanup-only effect leaves ref stuck at false after StrictMode double-mount
 
 ---
-*Last updated: 2026-05-12 after Phase 5 closure (commit `a43aabc`).*
+*Last updated: 2026-05-14 after Phase 6 closure (commits 9038eda, 5f30cda, a8933b9, ce04aa2).*
