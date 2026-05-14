@@ -15,7 +15,7 @@ Twelve weekend phases turn a hardcoded reel prototype into a deployed multi-user
 - [ ] **Phase 3: App shell** - Bottom nav, theming, React Router v7. Still no backend.
 - [ ] **Phase 4: Backend skeleton + Auth0** - Hono + Drizzle + Postgres + Auth0 wiring (split into 2 plans).
 - [ ] **Phase 5: City CRUD + map picker** - Click map → reverse-geocode → save. Reorder via deferred-unique transaction.
-- [ ] **Phase 6: Photo upload pipeline** - HEIC convert, resize, EXIF strip, OCI PAR upload, thumbnails.
+- [x] **Phase 6: Photo upload pipeline** - HEIC convert, resize, EXIF strip, OCI PAR upload, thumbnails. (4 plans; +95 tests, 140→235; first parallel-agent wave; OCI CORS via S3-compat landmine documented)
 - [ ] **Phase 7: Public URLs + handle reservation** - `/u/:handle` unauthenticated reel, handle picker, Nginx cache.
 - [ ] **Phase 8: Deploy part 1** - OCI VM setup, Docker Compose, Nginx + Let's Encrypt, DNS cutover.
 - [ ] **Phase 9: Deploy part 2 + empty/error states** - GitHub Actions CI, tagged auto-deploy, error UX. App live.
@@ -126,14 +126,14 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 06-01: HEIC convert + resize + EXIF strip on client
-- [ ] 06-02: OCI PAR upload + thumbnail pipeline (server, sharp on Bun)
+- [x] 06-01: HEIC convert + resize + EXIF strip on client
+- [x] 06-02: OCI PAR upload + thumbnail pipeline (server, sharp on Bun)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 06-03: Photo detail sheet UI + multi-select uploader + full-screen viewer + per-photo delete
+- [x] 06-03: Photo detail sheet UI + multi-select uploader + full-screen viewer + per-photo delete
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 06-04: REEL-09 photo cycling on /app/ reel
+- [x] 06-04: REEL-09 photo cycling on /app/ reel
 
 **Cross-cutting constraints:**
 - Single amber accent (DESIGN.md) — pins, focus rings, progress bars, CTAs

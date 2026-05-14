@@ -21,25 +21,25 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 6 — photo-upload-pipeline
+**Current focus:** Phase 7 — public URLs + handle reservation (next; planning not started)
 
 ## Current Position
 
-Phase: 6 (photo-upload-pipeline) — EXECUTING
-Plan: 4 of 4 complete (06-01 + 06-02 + 06-03 + 06-04 all done)
-Status: Wave 3 ✓ (235/235 tests; typecheck clean). Phase 6 complete. REEL-09 closed.
-Last activity: 2026-05-14 -- 06-04 shipped (chaptersWithPhotos + PhotoCycle + useAllPhotos + ChapterOverlay + ReducedMotionReel wired)
+Phase: 6 (photo-upload-pipeline) — ✓ COMPLETE
+Plan: 4 of 4 shipped (06-01 + 06-02 + 06-03 + 06-04)
+Status: Phase 6 closed. 235/235 tests pass. Typecheck clean. REEL-09 closed. Awaiting UAT before Phase 7 planning.
+Last activity: 2026-05-13 -- Phase 6 closed (Wave 1 parallel + Wave 2 + Wave 3 — full photo pipeline + reel cycling shipped)
 
-Progress: [█████░░░░░░░] 42% (5 of 12 phases complete)
+Progress: [██████░░░░░░] 50% (6 of 12 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total phases completed: 5
-- Total plans completed: 15 (1 Phase 1, 6 Phase 2 incl. hotfix, 3 Phase 3, 2 Phase 4, 3 Phase 5)
-- Average duration: ~5h45m per phase
-- Total execution time: ~30 hours
+- Total phases completed: 6
+- Total plans completed: 19 (1 Phase 1, 6 Phase 2 incl. hotfix, 3 Phase 3, 2 Phase 4, 3 Phase 5, 4 Phase 6)
+- Average duration: ~5h25m per phase
+- Total execution time: ~35 hours
 
 **By Phase:**
 
@@ -50,15 +50,20 @@ Progress: [█████░░░░░░░] 42% (5 of 12 phases complete)
 | 3 (App shell) | 3 | ~5h | ~1h40 | Parallel wave 1 + solo wave 2; plan-checker caught 3 blockers pre-execution |
 | 4 (Backend + Auth0) | 2 | ~6h | ~3h | Sequential plans (04-02 depends on 04-01); plan-checker round 1 REVISE (DATA-02 brittle constraint approach + Tasks 5/6 ordering); 3 Auth0 dashboard landmines on first live test |
 | 5 (Cities CRUD + reorder + reel API) | 3 | ~8h | ~2h40 | `superpowers:subagent-driven-development` workflow: fresh implementer subagent per task with two-stage review (spec compliance → code quality) + fix subagent per Important issue. 52 new tests (88 → 140). 8+ review-fix commits caught real bugs pre-merge (Drizzle wrapping, StrictMode mountedRef, concurrent drag race, focus rings, tz drift). 1 mid-Task-2 stream timeout recovered cleanly via fresh-agent resume. DEFERRABLE constraint exercised end-to-end for the first time via two-row swap test |
+| 6 (Photo upload pipeline + REEL-09) | 4 | ~5h | ~1h15 | First use of `superpowers:dispatching-parallel-agents` skill — Wave 1 (06-01 client pipeline + 06-02 server PAR/sharp) ran fully in parallel via disjoint file trees (atomic dep pre-install at 27fdab7 avoided bun.lock race). 95 new tests (140 → 235: 19 client pipeline, 19 server endpoints + MIME sniff, 36 UI components, 21 reel cycling). Plan-checker round 2 REVISE caught 4 blockers pre-execution (silently-dropped locked decisions: full-screen viewer + per-photo delete UI; server MIME byte-sniff missing; 06-04 cross-plan dep). 06-02 agent stream watchdog killed it after work completed but before turn close — atomic-per-task commits made disk verification + recovery trivial. Real OCI bucket provisioning (CORS via S3-compat API only — Native API silent-drop landmine documented in memory). |
 
 **Recent Trend:**
 
+- `superpowers:dispatching-parallel-agents` worked exactly as designed: Wave 1 of Phase 6 (06-01 + 06-02) shipped in parallel, ~90min wall clock for ~3h of serial work, zero cross-plan conflicts. Key prerequisite: atomic dep pre-install (one commit, one lockfile mutation) before dispatching parallel agents to avoid bun.lock race.
+- Plan-checker round-2 revision pattern now load-bearing for Phase 6: round 1 caught 4 blockers (2 silently-dropped CONTEXT.md decisions, 1 server MIME-sniff gap, 1 cross-plan dep miss). The cost of one revision round was ~10min; the cost of executing wrong plans would have been hours.
+- Stream watchdog kills are recoverable with atomic-per-task commit discipline. Phase 6 Waves 1+3 both had stream timeouts AFTER all task commits + SUMMARY.md were on disk — git log + ls verified, no rework needed.
+- OCI Object Storage CORS landmine: Console UI has no CORS tab; Native API silently drops `corsRules` from `bucket update --from-json` (HTTP 200 with no rules persisted); S3-compat endpoint via AWS CLI is the only working path. Saved as project memory.
 - Subagent-driven-development with two-stage review caught more bugs pre-merge than gsd-executor's single-pass model (Phase 5: 5 distinct latent bugs surfaced by reviewers, all fixed before merge)
 - UAT still catches StrictMode-specific bugs (mountedRef pattern, MapPicker effect coordination) — review subagents miss these because they don't see runtime behavior
 - DEFERRABLE unique constraint from Phase 4 was real and load-bearing; the two-row swap test proves the constraint works under concurrent reorder
 - Drizzle's `DrizzleQueryError` wrapping silently breaks naïve `err.code === '23505'` checks — saved as project memory; future server code uses `pgErrorCode(err)` helper
-- Test count: 88 → 140 (52 new across Phase 5: 9 reorder + 9 groupChapters + 12 cityToChapter + 8 PATCH/DELETE + 7 POST + 6 GET + a handful of fix-related additions)
-- cities.test.ts hit 945 lines (past 800 ceiling) — flagged for split in Phase 6 housekeeping
+- Test count growth: 88 → 140 (Phase 5) → 235 (Phase 6) — +147 tests across 2 phases
+- cities.test.ts hit 945 lines (past 800 ceiling) in Phase 5 — still flagged for split; deferred into Phase 7+ housekeeping
 
 *Updated after each phase completion*
 
