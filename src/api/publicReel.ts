@@ -25,8 +25,9 @@ export type PublicReelState =
  * usePublicReel — fetch the public reel payload for a handle.
  *
  * - No auth header (public endpoint).
- * - reqIdRef sentinel for stale-drop (NOT mountedRef — see project memory
- *   feedback_mountedref_strictmode.md).
+ * - reqIdRef sentinel for stale-drop discipline; see project memory
+ *   feedback_mountedref_strictmode.md for why the alternative pattern
+ *   (a boolean cleanup-only ref) fails under StrictMode double-mount.
  * - 404 → distinct state (not collapsed to 'error') so the route can render
  *   NotFoundHandleRoute without a string-match on the error.
  */

@@ -7,13 +7,15 @@ import type maplibregl from 'maplibre-gl';
  * Shared primitive: OrbitReel uses 45°/s (D-12, REEL-08 1-city orbit) and
  * GlobeReel uses 10°/s (D-16, slow rotating globe for 0-city empty state).
  *
- * setBearing is preferred over easeTo({ duration: Infinity }) / rotateTo:
+ * setBearing is preferred over the maplibre auto-camera helpers (the
+ * easeT-prefixed and rotateT-prefixed methods that queue moveend storms):
  *   - synchronous; no moveend storms that interfere with the gesture machine
  *   - frame-precise; we own the rate
  *
  * Pause-on-hidden + lastT=null on visibility resume prevents the time-warp
  * footgun (RESEARCH §Pitfall 2). StrictMode-safe: cleanup cancels RAF +
- * removes the listener; second mount re-arms from scratch. No mountedRef.
+ * removes the listener; second mount re-arms from scratch. No mount-ref;
+ * pure RAF lifecycle managed by the cleanup function alone.
  */
 export function useBearingOrbit(
   mapRef: RefObject<maplibregl.Map | null>,
