@@ -24,6 +24,9 @@ const envSchema = z.object({
   OCI_USER_OCID: z.string().optional(),
   OCI_FINGERPRINT: z.string().optional(),
   OCI_PRIVATE_KEY_PATH: z.string().optional(),
+  // Optional. Set ONLY if the PEM at OCI_PRIVATE_KEY_PATH was generated with
+  // a passphrase. Leave unset for unencrypted PEMs.
+  OCI_PRIVATE_KEY_PASSPHRASE: z.string().optional(),
   OCI_REGION: z.string().optional(),
   OCI_NAMESPACE: z.string().optional(),
   OCI_BUCKET_NAME: z.string().optional(),

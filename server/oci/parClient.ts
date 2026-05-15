@@ -59,6 +59,9 @@ function buildRealClient(): OciClient {
   const fingerprint = env.OCI_FINGERPRINT!;
   const privateKeyPath = env.OCI_PRIVATE_KEY_PATH!;
   const region = env.OCI_REGION!;
+  // Optional — only present when the PEM is passphrase-protected. SDK
+  // signature: (tenancy, user, fingerprint, privateKey, passphrase, region).
+  const passphrase = env.OCI_PRIVATE_KEY_PASSPHRASE ?? null;
 
   const privateKey = readFileSync(privateKeyPath, 'utf8');
 
@@ -67,7 +70,7 @@ function buildRealClient(): OciClient {
     user,
     fingerprint,
     privateKey,
-    null,
+    passphrase,
     common.Region.fromRegionId(region),
   );
 
