@@ -153,12 +153,18 @@ Plans:
   3. 0-city reel shows world view + "No trips yet" caption.
   4. 1-city reel shows 8s orbit camera at zoom 14, pitch 60.
   5. Nginx caches public reel HTML keyed by handle.
-**Plans**: 3 plans (TBD)
+**Plans**: 3 plans (planned 2026-05-14)
 
 Plans:
-- [ ] 07-01: Handle reservation flow + reserved-word list
-- [ ] 07-02: Public reel route + 0/1-city empty states
-- [ ] 07-03: Nginx public-reel cache config
+
+**Wave 1**
+- [ ] 07-01-PLAN.md — Handle reservation flow: GET /api/handles/check + HandlePickerModal upgrade (native dialog + live debounced check + URL preview) [AUTH-05/06/07]
+
+**Wave 2** *(depends on 07-01 for server/index.ts mount-block coordination)*
+- [ ] 07-02-PLAN.md — Public reel: GET /api/public/u/:handle + usePublicReel + HandleReelRoute rewrite + OrbitReel (1-city 45°/s orbit) + GlobeReel (0-city slow globe) + reduced-motion variants + NotFoundHandleRoute [PUBLIC-01/02/03, REEL-08]
+
+**Wave 3** *(depends on 07-02 for app-layer Cache-Control header contract)*
+- [ ] 07-03-PLAN.md — ops/nginx/timeline.conf: proxy_cache_path zone + /api/public/u/[^/]+$ + /u/[^/]+$ location blocks + TTL 5m/1m + X-Cache-Status + X-No-Cache bypass (file committed; Phase 8 wires) [PUBLIC-04]
 
 ### Phase 8: Deploy part 1
 **Goal**: First public live domain. Manual deploy via SSH. OCI VM provisioned, Docker Compose stack running, TLS auto-renewing.
