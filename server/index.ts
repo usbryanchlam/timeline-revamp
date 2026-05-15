@@ -7,6 +7,7 @@ import { lazyProvisionUser } from './auth/lazyProvision.js';
 import { meRouter } from './routes/me.js';
 import { citiesRouter } from './routes/cities.js';
 import { photosRouter, photosNestedRouter } from './routes/photos.js';
+import { handlesCheckHandler } from './routes/handlesCheck.js';
 // Side-effect import: registers the Hono ContextVariableMap
 // augmentation so c.set('user', row) is typed as User (not unknown)
 // across this process. Removing this import would silently relax
@@ -22,6 +23,14 @@ app.use('*', logger());
 // can probe end-to-end through the Vite dev proxy.
 app.get('/health', (c) => c.json({ status: 'ok' }));
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
+
+// PUBLIC — no auth. Live availability check for the handle picker
+// (AUTH-05/06/07). MUST be registered BEFORE the /api/me JWT mounts
+// below — Hono runs middleware in registration order, and Phase 7
+// RESEARCH §Pitfall 6 documents the regression: a bulk
+// app.use('/api/*', requireJwt, ...) would intercept this route.
+// Response is Cache-Control: no-store per D-04.
+app.get('/api/handles/check', handlesCheckHandler);
 
 // AUTHENTICATED — JWT validation, then lazy provisioning, then routes.
 // Order matters: requireJwt MUST run before lazyProvisionUser because
