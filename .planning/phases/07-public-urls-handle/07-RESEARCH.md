@@ -823,27 +823,31 @@ export function usePublicReel(handle: string): State {
 | A7 | Phase 6's `getPublicUrl(masterKey)` works without authentication context | publicReel code | The OCI bucket prefix is public-read per PROJECT.md decision; URL construction is pure (no API call). **Verified by reading Phase 6 architecture in STATE.md.** |
 | A8 | The 0-city public reel surface should NOT render the `ChapterOverlay`, `ChapterRail`, or `CTAPill` (the standard reel chrome) since there are no chapters | GlobeReel component design | If user expectation is "reel chrome still appears", design needs adjustment. DESIGN.md says no empty-state illustrations on public; doesn't speak to chrome. **Confirm with user/CONTEXT-implied minimal-chrome reading.** D-16 caption "anchored bottom via existing ChapterOverlay-style layout slot" suggests we keep the layout slot but no chapter data. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **301 redirect for uppercase handles** (CONTEXT.md D-06 defers this)
    - What we know: `validateHandle` lowercases; `users.handle` is always lowercase; case-insensitive lookup handles the read correctly.
    - What's unclear: Whether to 301 `/u/Bryan` → `/u/bryan` for canonical URL, or quietly serve the same content at either case.
    - Recommendation: Defer to plan. Server-side 301 is one extra `if` in publicReel handler. Plan can decide; both options are trivial.
+   - **RESOLVED:** 07-02 Task 1 chose case-insensitive `LOWER()` lookup; no 301 redirect — same content served at either case.
 
 2. **CTAPill on public reel surfaces**
    - What we know: Existing `Reel.tsx` renders `<CTAPill />` ("Make your own →"). The 0-city and 1-city variants are new components — do they reuse it?
    - What's unclear: Whether OrbitReel/GlobeReel render the CTA. DESIGN.md says the public reel always has a CTA top-right.
    - Recommendation: Plan to include CTAPill in OrbitReel and GlobeReel; confirm in 07-02 implementation.
+   - **RESOLVED:** 07-02 Task 4 includes CTAPill on OrbitReel and GlobeReel (per behavior tests 6 and 13).
 
 3. **Photo cycling in 1-city orbit (REEL-09 interaction)**
    - What we know: Phase 6 implemented photo cycling within a chapter group; D-13 says it should continue in orbit.
    - What's unclear: Whether the cycle primitive is event-driven (chapter-change) or timer-driven (4s interval per Phase 6 SUMMARY).
    - Recommendation: Plan 07-02 reads `src/hooks/useCyclingPhotoIndex.ts` (or whatever the Phase 6 hook is named) and confirms it timer-based. Budget half a task for an adapter if it's event-driven.
+   - **RESOLVED:** Phase 6 06-04-SUMMARY confirms PhotoCycle is timer-driven and independent of chapter transitions; 07-02 Task 4 reuses it directly in OrbitReel.
 
 4. **Existing HandlePickerModal: rewrite vs extend?**
    - What we know: Phase 4 shipped a working modal with client-side validation and submit. Phase 7 adds the live debounced check + URL preview + (recommended) native `<dialog>`.
    - What's unclear: Whether plan 07-01 modifies the existing file or replaces it.
    - Recommendation: Modify in place. Diff is bounded: add `useHandleCheck` hook usage, add the URL preview `<p>`, swap the wrapper div for `<dialog>` with showModal effect. Keep the existing form-submit logic verbatim.
+   - **RESOLVED:** 07-01 Task 3 modifies in place — bounded diff, preserves existing import structure.
 
 ## Environment Availability
 
