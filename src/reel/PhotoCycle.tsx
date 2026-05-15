@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react';
 import { usePrefersReducedMotion } from '@/reel/usePrefersReducedMotion';
 import type { PhotoCard } from '@/types/reel';
 
-const CYCLE_INTERVAL_MS = 4000;
+// Tuned 2026-05-14 after real-device testing. Chapter dwell is 4500ms
+// (autoPlayDwellMs in useGestureMachine.ts); a 4000ms cycle meant photo
+// #2 only got ~500ms on-screen before the camera flew to the next city.
+// 2000ms gives each photo a full ~2s for a typical 2-photo chapter.
+const CYCLE_INTERVAL_MS = 2000;
 const CROSSFADE_MS = 200;
 
 interface PhotoCycleProps {

@@ -59,14 +59,14 @@ describe('PhotoCycle', () => {
     expect(img.getAttribute('src')).toContain('thumb/a');
   });
 
-  it('cycles to next photo after 4000ms with fake timers', () => {
+  it('cycles to next photo after 2000ms with fake timers', () => {
     vi.useFakeTimers();
     mockUsePrefersReducedMotion.mockReturnValue(false);
     const photos = [makeCard('a'), makeCard('b'), makeCard('c')];
     render(<PhotoCycle photos={photos} />);
     expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/a');
     act(() => {
-      vi.advanceTimersByTime(4000);
+      vi.advanceTimersByTime(2000);
     });
     expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/b');
   });
@@ -85,8 +85,8 @@ describe('PhotoCycle', () => {
     });
     expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/a');
     // No interval should have been scheduled for cycling
-    // (the only setInterval calls should NOT include 4000ms cycle)
-    const cycleCalls = setIntervalSpy.mock.calls.filter((args) => args[1] === 4000);
+    // (the only setInterval calls should NOT include 2000ms cycle)
+    const cycleCalls = setIntervalSpy.mock.calls.filter((args) => args[1] === 2000);
     expect(cycleCalls).toHaveLength(0);
   });
 
