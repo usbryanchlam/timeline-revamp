@@ -12,6 +12,7 @@ import {
   type ReelEvent,
   type ReelState,
 } from './stateMachine';
+import { AUTOPLAY_DWELL_MS } from '@/reel/timing';
 
 interface PointerSample {
   readonly id: number;
@@ -54,7 +55,7 @@ interface Result {
  */
 export function useGestureMachine({
   totalChapters,
-  autoPlayDwellMs = 4500,
+  autoPlayDwellMs = AUTOPLAY_DWELL_MS,
 }: Options): Result {
   const [state, baseDispatch] = useReducer(
     (s: ReelState, e: ReelEvent) => transition(s, e, totalChapters),

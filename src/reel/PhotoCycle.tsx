@@ -1,32 +1,43 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePrefersReducedMotion } from '@/reel/usePrefersReducedMotion';
+import { CROSSFADE_MS, cycleIntervalForPhotoCount } from '@/reel/timing';
 import type { PhotoCard } from '@/types/reel';
-
-// Tuned 2026-05-14 after real-device testing. Chapter dwell is 4500ms
-// (autoPlayDwellMs in useGestureMachine.ts); a 4000ms cycle meant photo
-// #2 only got ~500ms on-screen before the camera flew to the next city.
-// 2000ms gives each photo a full ~2s for a typical 2-photo chapter.
-const CYCLE_INTERVAL_MS = 2000;
-const CROSSFADE_MS = 200;
 
 interface PhotoCycleProps {
   readonly photos: readonly PhotoCard[];
+  /** Override dwell budget (ms). Defaults to AUTOPLAY_DWELL_MS. Public reel
+   *  routes with different timing can pass their own value. */
+  readonly dwellMs?: number;
 }
 
 /**
- * REEL-09 — cycle a chapter's photos at 4s interval with 200ms crossfade.
+ * REEL-09 — cycle a chapter's photos within the chapter's dwell window.
+ *
+ * Each photo gets an equal slice of the dwell time (with a floor so the
+ * crossfade never dominates). With dwell=4500ms:
+ *   2 photos → 2250ms each
+ *   3 photos → 1500ms each
+ *   4 photos → 1125ms each
+ *   5 photos →  900ms each
+ *   6+ photos → 800ms each (floor; last photos wait for next visit)
+ *
  * prefers-reduced-motion: reduce shows only the first photo; no interval
  * scheduled; no transition.
  *
- * Preload discipline: only the NEXT photo gets a <link rel="preload">.
- * Preloading all photos at once would burst-fetch on chapter land.
+ * Preload discipline: only the NEXT photo is preloaded (hidden <img>) — not
+ * the entire set — to avoid a burst-fetch on chapter land.
  *
  * Timer cleanup: cleared on unmount AND when the photos prop identity
  * changes (new chapter = new effect run = old interval cleared).
  */
-export function PhotoCycle({ photos }: PhotoCycleProps) {
+export function PhotoCycle({ photos, dwellMs }: PhotoCycleProps) {
   const reduced = usePrefersReducedMotion();
   const [index, setIndex] = useState(0);
+
+  const cycleMs = useMemo(
+    () => cycleIntervalForPhotoCount(photos.length, dwellMs),
+    [photos.length, dwellMs],
+  );
 
   // Reset to first photo when the chapter's photo set changes (identity).
   useEffect(() => {
@@ -36,12 +47,12 @@ export function PhotoCycle({ photos }: PhotoCycleProps) {
   // Cycle timer — only when motion is allowed and there are multiple photos.
   useEffect(() => {
     if (reduced) return;
-    if (photos.length <= 1) return;
+    if (cycleMs === 0) return;
     const timer = window.setInterval(() => {
       setIndex((i) => (i + 1) % photos.length);
-    }, CYCLE_INTERVAL_MS);
+    }, cycleMs);
     return () => window.clearInterval(timer);
-  }, [reduced, photos]);
+  }, [reduced, photos, cycleMs]);
 
   if (photos.length === 0) return null;
 

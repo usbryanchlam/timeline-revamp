@@ -59,16 +59,71 @@ describe('PhotoCycle', () => {
     expect(img.getAttribute('src')).toContain('thumb/a');
   });
 
-  it('cycles to next photo after 2000ms with fake timers', () => {
+  it('cycles to next photo after dwell/N ms (3 photos → 1500ms each)', () => {
     vi.useFakeTimers();
     mockUsePrefersReducedMotion.mockReturnValue(false);
     const photos = [makeCard('a'), makeCard('b'), makeCard('c')];
     render(<PhotoCycle photos={photos} />);
     expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/a');
+    // At 4500ms dwell ÷ 3 photos = 1500ms per photo.
     act(() => {
-      vi.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(1500);
     });
     expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/b');
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
+    expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/c');
+  });
+
+  it('two photos cycle at 2250ms each (4500ms / 2)', () => {
+    vi.useFakeTimers();
+    mockUsePrefersReducedMotion.mockReturnValue(false);
+    const photos = [makeCard('a'), makeCard('b')];
+    render(<PhotoCycle photos={photos} />);
+    act(() => {
+      vi.advanceTimersByTime(2250);
+    });
+    expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/b');
+  });
+
+  it('many photos clamp to the 800ms floor (10 photos → 800ms each, not 450ms)', () => {
+    vi.useFakeTimers();
+    mockUsePrefersReducedMotion.mockReturnValue(false);
+    const photos = Array.from({ length: 10 }, (_, i) => makeCard(`p${i}`));
+    render(<PhotoCycle photos={photos} />);
+    expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/p0');
+    // 4500 / 10 = 450ms, but the floor is 800ms — verify by advancing
+    // just under the floor and confirming NO advance, then past the floor.
+    act(() => {
+      vi.advanceTimersByTime(450);
+    });
+    expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/p0');
+    act(() => {
+      vi.advanceTimersByTime(400); // total 850ms → past 800ms floor
+    });
+    expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/p1');
+  });
+
+  it('respects dwellMs prop override (3000ms dwell, 3 photos → 1000ms each)', () => {
+    vi.useFakeTimers();
+    mockUsePrefersReducedMotion.mockReturnValue(false);
+    const photos = [makeCard('a'), makeCard('b'), makeCard('c')];
+    render(<PhotoCycle photos={photos} dwellMs={3000} />);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/b');
+  });
+
+  it('single photo: no interval scheduled', () => {
+    vi.useFakeTimers();
+    mockUsePrefersReducedMotion.mockReturnValue(false);
+    const setIntervalSpy = vi.spyOn(window, 'setInterval');
+    render(<PhotoCycle photos={[makeCard('only')]} />);
+    expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/only');
+    // No cycle timer should be scheduled at all.
+    expect(setIntervalSpy).not.toHaveBeenCalled();
   });
 
   it('prefers-reduced-motion: shows only first photo, no timer scheduled', () => {
@@ -84,10 +139,8 @@ describe('PhotoCycle', () => {
       vi.advanceTimersByTime(8000);
     });
     expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/a');
-    // No interval should have been scheduled for cycling
-    // (the only setInterval calls should NOT include 2000ms cycle)
-    const cycleCalls = setIntervalSpy.mock.calls.filter((args) => args[1] === 2000);
-    expect(cycleCalls).toHaveLength(0);
+    // No interval should have been scheduled for cycling under reduce-motion.
+    expect(setIntervalSpy).not.toHaveBeenCalled();
   });
 
   it('cleans up timer on unmount', () => {
