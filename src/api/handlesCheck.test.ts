@@ -24,7 +24,7 @@ describe('useHandleCheck', () => {
   });
 
   it('returns { state: "idle" } for empty candidate and does not fetch', () => {
-    const fetchSpy = vi.spyOn(global, 'fetch');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const { result } = renderHook(() => useHandleCheck('', true));
     expect(result.current).toEqual({ state: 'idle' });
     // Even after advancing timers past the debounce window, no fetch.
@@ -35,7 +35,7 @@ describe('useHandleCheck', () => {
   });
 
   it('returns { state: "idle" } when enabled=false and does not fetch', () => {
-    const fetchSpy = vi.spyOn(global, 'fetch');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const { result } = renderHook(() => useHandleCheck('bryan', false));
     expect(result.current).toEqual({ state: 'idle' });
     act(() => {
@@ -46,7 +46,7 @@ describe('useHandleCheck', () => {
 
   it('returns "checking" immediately, fetches only AFTER 300ms debounce', () => {
     const fetchSpy = vi
-      .spyOn(global, 'fetch')
+      .spyOn(globalThis, 'fetch')
       .mockResolvedValue(jsonResponse({ available: true }));
     const { result } = renderHook(() => useHandleCheck('bryan', true));
     expect(result.current).toEqual({ state: 'checking' });
@@ -68,7 +68,7 @@ describe('useHandleCheck', () => {
 
   it('debounces rapid typing: 3 keystrokes within 300ms = 1 fetch', async () => {
     const fetchSpy = vi
-      .spyOn(global, 'fetch')
+      .spyOn(globalThis, 'fetch')
       .mockResolvedValue(jsonResponse({ available: true }));
     const { rerender } = renderHook(
       ({ c }: { c: string }) => useHandleCheck(c, true),
@@ -106,7 +106,7 @@ describe('useHandleCheck', () => {
     const secondFetch = new Promise<Response>((r) => {
       resolveSecond = r;
     });
-    vi.spyOn(global, 'fetch')
+    vi.spyOn(globalThis, 'fetch')
       .mockReturnValueOnce(firstFetch)
       .mockReturnValueOnce(secondFetch);
 
@@ -145,7 +145,7 @@ describe('useHandleCheck', () => {
 
   it('calls AbortController.abort() on cleanup', () => {
     const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-    vi.spyOn(global, 'fetch').mockResolvedValue(jsonResponse({ available: true }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ available: true }));
     const { unmount } = renderHook(() => useHandleCheck('bryan', true));
     // Cleanup on unmount: must abort.
     unmount();
@@ -159,7 +159,7 @@ describe('useHandleCheck', () => {
     ['reserved'],
     ['taken'],
   ] as const)('maps server reason "%s" to { state: "unavailable", reason }', async (reason) => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({ available: false, reason }),
     );
     const { result } = renderHook(() => useHandleCheck('bryan', true));
@@ -172,7 +172,7 @@ describe('useHandleCheck', () => {
   });
 
   it('maps { available: true } to { state: "available" }', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(jsonResponse({ available: true }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ available: true }));
     const { result } = renderHook(() => useHandleCheck('bryan', true));
     await act(async () => {
       vi.advanceTimersByTime(300);
@@ -183,7 +183,7 @@ describe('useHandleCheck', () => {
   });
 
   it('maps non-ok response (e.g. 500) to { state: "error" }', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue(
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({ error: 'oops' }, { ok: false, status: 500 }),
     );
     const { result } = renderHook(() => useHandleCheck('bryan', true));
@@ -198,7 +198,7 @@ describe('useHandleCheck', () => {
   it('swallows AbortError silently (does not set error state)', async () => {
     // fetch rejects with an AbortError as a real abort would.
     const abortError = Object.assign(new Error('aborted'), { name: 'AbortError' });
-    vi.spyOn(global, 'fetch').mockRejectedValue(abortError);
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(abortError);
     const { result } = renderHook(() => useHandleCheck('bryan', true));
     await act(async () => {
       vi.advanceTimersByTime(300);
