@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: executing
-stopped_at: "Wave 3 (06-04) shipped: PhotoCard type + chaptersWithPhotos + PhotoCycle + useAllPhotos + ChapterOverlay + ReducedMotionReel + AppReelRoute wired. REEL-09 closed. 235/235 tests pass. Typecheck clean. 4 atomic commits on main. Per-plan SUMMARY at .planning/phases/06-photo-upload-pipeline/06-04-SUMMARY.md. Phase 6 complete."
-last_updated: "2026-05-14T05:25:00.000Z"
-last_activity: 2026-05-14 -- 06-04 REEL-09 photo cycling complete (chaptersWithPhotos + PhotoCycle + useAllPhotos wired)
+status: planning
+stopped_at: "Phase 7 context gathered: 4 gray areas decided — blocking handle-picker modal + live debounced uniqueness check; new GET /api/public/u/:handle one-shot endpoint; continuous 360° orbit at 45°/s for 1-city reel + slow-rotating globe for 0-city; Nginx .conf shipped in Phase 7 with TTL-only invalidation (Phase 8 wires on VM). CONTEXT.md + DISCUSSION-LOG.md at .planning/phases/07-public-urls-handle/. Ready for /gsd-plan-phase 7."
+last_updated: "2026-05-14T22:30:00.000Z"
+last_activity: 2026-05-14 -- Phase 7 discuss-phase complete (CONTEXT.md + DISCUSSION-LOG.md committed 8225c15)
 progress:
   total_phases: 12
   completed_phases: 6
@@ -25,9 +25,9 @@ See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 ## Current Position
 
-Phase: 6 (photo-upload-pipeline) — ✓ COMPLETE
-Plan: 4 of 4 shipped (06-01 + 06-02 + 06-03 + 06-04)
-Status: Phase 6 closed. 235/235 tests pass. Typecheck clean. REEL-09 closed. Awaiting UAT before Phase 7 planning.
+Phase: 7 (public-urls-handle) — CONTEXT.md captured, plans not yet drafted
+Plan: 0 of 3 (07-01 handle reservation flow, 07-02 public reel route + empty states, 07-03 Nginx public-reel cache)
+Status: discuss-phase complete. CONTEXT.md locks 4 decision areas. Next: /gsd-plan-phase 7.
 Last activity: 2026-05-13 -- Phase 6 closed (Wave 1 parallel + Wave 2 + Wave 3 — full photo pipeline + reel cycling shipped)
 
 Progress: [██████░░░░░░] 50% (6 of 12 phases complete)
