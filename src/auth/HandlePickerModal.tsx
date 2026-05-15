@@ -1,21 +1,20 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { validateHandle } from '@server/handles/validate.js';
 import { useApi } from '@/auth/useApi';
+import { useHandleCheck } from '@/api/handlesCheck';
 
-// AUTH-07 modal. Presentational only — wrapped by HandlePickerGate
-// which decides when to render. Client-side validation uses the SAME
-// validate.ts as the API route (single source of truth across the
-// trust boundary), so the user sees the same error messages whether
-// the check happens locally or on the server.
+// AUTH-05/06/07 — Phase 7 upgrade of the Phase 4 handle picker.
 //
-// Submit flow:
-//   1. Re-validate with shared validateHandle (cheap; avoids POSTing
-//      something the server is going to reject anyway)
-//   2. POST /api/me/handle with the lowercased candidate
-//   3. 200 → onPicked(handle), modal closes
-//      409 → "taken" message
-//      422 → server disagrees with our local check (shouldn't happen,
-//             but treat as generic error so the user can try again)
+// Modal is a native <dialog> opened via showModal() so the browser handles
+// focus trap + backdrop natively. The `cancel` event (Esc) is intercepted
+// and preventDefault'd per D-01 — the modal is blocking and cannot be
+// dismissed until a handle is claimed.
+//
+// Live availability check (D-02): useHandleCheck debounces the input by
+// 300ms and only fires when local validateHandle already passes. Cache-
+// Control: no-store on the endpoint side keeps the answer fresh between
+// racing pickers. The authoritative claim path is still POST /api/me/handle,
+// which re-validates and collapses 23505 → 409.
 
 type Status = 'idle' | 'submitting' | { error: string };
 type ValidationReason = 'too_short' | 'too_long' | 'invalid_chars' | 'reserved';
@@ -37,9 +36,23 @@ export function HandlePickerModal({ onPicked }: { onPicked: (handle: string) => 
   const api = useApi();
   const [input, setInput] = useState('');
   const [status, setStatus] = useState<Status>('idle');
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
 
   const preview = input.trim().toLowerCase();
   const localValidation = preview.length === 0 ? null : validateHandle(input);
+  const check = useHandleCheck(preview, localValidation?.ok === true);
+
+  useEffect(() => {
+    const d = dialogRef.current;
+    if (!d) return;
+    if (!d.open) d.showModal();
+    const onCancel = (e: Event) => e.preventDefault(); // D-01 blocking — Esc cannot dismiss.
+    d.addEventListener('cancel', onCancel);
+    return () => {
+      d.removeEventListener('cancel', onCancel);
+      if (d.open) d.close();
+    };
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -71,14 +84,15 @@ export function HandlePickerModal({ onPicked }: { onPicked: (handle: string) => 
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6">
-      <form
-        onSubmit={submit}
-        className="bg-bg-elev rounded-2xl p-6 w-full max-w-sm space-y-4 border border-line"
-      >
-        <h2 className="text-display text-xl">Pick your handle</h2>
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="handle-picker-title"
+      className="bg-bg-elev rounded-2xl p-6 w-full max-w-sm space-y-4 border border-line backdrop:bg-black/60 m-auto"
+    >
+      <form onSubmit={submit} className="space-y-4">
+        <h2 id="handle-picker-title" className="text-display text-xl">Pick your handle</h2>
         <p className="text-ink-mute text-sm">
-          This is your public reel URL. Lowercase letters, numbers, and hyphens. 3-20 characters.
+          lowercase letters, numbers, hyphens · 3–20 chars
         </p>
         <input
           autoFocus
@@ -87,30 +101,43 @@ export function HandlePickerModal({ onPicked }: { onPicked: (handle: string) => 
             setInput(e.target.value);
             setStatus('idle');
           }}
-          placeholder="bryan"
+          placeholder="e.g. bryan"
           className="w-full px-3 py-2 rounded-lg bg-bg border border-line text-ink"
           maxLength={20}
           autoComplete="off"
+          aria-describedby="handle-picker-url-preview"
         />
-        {preview && preview !== input && (
-          <p className="text-xs text-ink-mute">
-            Will be saved as <code>{preview}</code>
+        <p id="handle-picker-url-preview" className="text-xs text-ink-mute">
+          timeline.bryanlam.dev/u/<code>{preview || '<input>'}</code>
+        </p>
+        {/* Live-check icon row — single amber accent for the check ONLY. */}
+        {localValidation?.ok && check.state === 'checking' && (
+          <p className="text-xs text-ink-mute" role="status" aria-live="polite">Checking…</p>
+        )}
+        {localValidation?.ok && check.state === 'available' && (
+          <p className="text-xs text-amber-500" role="status" aria-live="polite">✓ Available</p>
+        )}
+        {localValidation?.ok && check.state === 'unavailable' && (
+          <p className="text-xs text-ink-mute" role="status" aria-live="polite">
+            {check.reason === 'taken'
+              ? 'That handle is taken. Try another.'
+              : errorFor(check.reason as ValidationReason)}
           </p>
         )}
         {localValidation && !localValidation.ok && (
-          <p className="text-xs text-amber-500">{errorFor(localValidation.reason)}</p>
+          <p className="text-xs text-ink-mute">{errorFor(localValidation.reason)}</p>
         )}
         {typeof status === 'object' && 'error' in status && (
           <p className="text-xs text-amber-500">{status.error}</p>
         )}
         <button
           type="submit"
-          disabled={status === 'submitting' || !localValidation?.ok}
+          disabled={status === 'submitting' || check.state !== 'available'}
           className="w-full bg-amber-500 text-black font-semibold py-2 rounded-lg disabled:opacity-50"
         >
-          {status === 'submitting' ? 'Saving…' : 'Claim handle'}
+          {status === 'submitting' ? 'Saving…' : 'Claim'}
         </button>
       </form>
-    </div>
+    </dialog>
   );
 }
