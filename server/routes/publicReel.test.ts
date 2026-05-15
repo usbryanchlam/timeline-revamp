@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
-import { eq, inArray } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 
 // MUST set env BEFORE the dynamic imports below. server/env.ts validates
 // synchronously and process.exit(1) on failure. /api/public/u/:handle is

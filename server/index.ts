@@ -8,6 +8,7 @@ import { meRouter } from './routes/me.js';
 import { citiesRouter } from './routes/cities.js';
 import { photosRouter, photosNestedRouter } from './routes/photos.js';
 import { handlesCheckHandler } from './routes/handlesCheck.js';
+import { publicReelRouter } from './routes/publicReel.js';
 // Side-effect import: registers the Hono ContextVariableMap
 // augmentation so c.set('user', row) is typed as User (not unknown)
 // across this process. Removing this import would silently relax
@@ -31,6 +32,12 @@ app.get('/api/health', (c) => c.json({ status: 'ok' }));
 // app.use('/api/*', requireJwt, ...) would intercept this route.
 // Response is Cache-Control: no-store per D-04.
 app.get('/api/handles/check', handlesCheckHandler);
+
+// PUBLIC — no auth. One-shot reel payload for /u/:handle (PUBLIC-01).
+// MUST be registered BEFORE the /api/me JWT mounts below for the same
+// registration-order reason documented above. Cache-Control headers are
+// set by the handler (max-age=300 on 200, max-age=60 on 404) per D-08.
+app.route('/api/public/u', publicReelRouter);
 
 // AUTHENTICATED — JWT validation, then lazy provisioning, then routes.
 // Order matters: requireJwt MUST run before lazyProvisionUser because
