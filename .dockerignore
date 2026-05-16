@@ -1,0 +1,18 @@
+# Keep secrets and untracked dev state out of the build context.
+# T-08-01 / T-08-02 (Phase 8 threat register): .env and .oci MUST be in this
+# list — .env arrives at runtime via compose env_file:, and the OCI PEM
+# arrives via a read-only bind mount (docker-compose.prod.yml).
+
+node_modules
+.env
+.env.local
+.env.*.local
+.git
+.gitignore
+.planning
+.oci
+coverage
+dist
+.vscode
+.DS_Store
+*.log

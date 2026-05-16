@@ -1,0 +1,47 @@
+# Production override layered on top of docker-compose.yml.
+# Compose merges by service key, so this file only declares the deltas:
+#   - postgres: strip the dev port publish (D-11), restart=always.
+#   - api: new service definition (dev doesn't run the API in compose;
+#     dev uses tsx watch on the host instead).
+#
+# Invoke with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    # D-11: Postgres MUST NOT publish 5432 in production. The empty list
+    # overrides the dev compose's `ports: ["5432:5432"]`. Postgres remains
+    # reachable from the api container via Docker's internal network
+    # (`postgres:5432` DNS).
+    ports: []
+    restart: always
+
+  api:
+    build:
+      context: .
+      args:
+        # VITE_* are inlined into dist/assets/*.js at vite build time.
+        # See feedback_dual_runtime_env.md: dual-runtime projects must
+        # populate both unprefixed (runtime) and VITE_* (build-time)
+        # copies in the .env on the VM. Missing args → broken bundle.
+        VITE_MAPTILER_KEY: ${VITE_MAPTILER_KEY}
+        VITE_AUTH0_DOMAIN: ${VITE_AUTH0_DOMAIN}
+        VITE_AUTH0_CLIENT_ID: ${VITE_AUTH0_CLIENT_ID}
+        VITE_AUTH0_AUDIENCE: ${VITE_AUTH0_AUDIENCE}
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://timeline:${POSTGRES_PASSWORD}@postgres:5432/timeline
+      PORT: 8787
+    # Loopback-only bind. Nginx (08-02) reverse-proxies from the host's
+    # public 80/443 to 127.0.0.1:8787. Public attack surface in 08-01 = zero.
+    ports:
+      - "127.0.0.1:8787:8787"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    volumes:
+      # OCI PEM file (read-only). Container sees it at /app/.oci/<file>.pem.
+      # OCI_PRIVATE_KEY_PATH in .env should point to that container-side path.
+      - ./.oci:/app/.oci:ro
