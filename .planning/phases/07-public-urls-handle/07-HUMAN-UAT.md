@@ -3,7 +3,7 @@ status: partial
 phase: 07-public-urls-handle
 source: [07-VERIFICATION.md]
 started: 2026-05-15T11:15:00Z
-updated: 2026-05-15T11:15:00Z
+updated: 2026-05-15T19:35:00Z
 ---
 
 ## Current Test
@@ -30,14 +30,14 @@ result: [pending]
 ### 4. HandlePickerModal cannot be dismissed in a real browser
 
 expected: Modal stays open until POST /api/me/handle returns 200; backdrop click does not close (browser default for `<dialog>.showModal`); pressing Esc fires the cancel event which is `preventDefault`'d. Sign in as a fresh user (no handle yet), land on `/app/*`, attempt: (a) click backdrop area outside modal, (b) press Esc, (c) press Tab repeatedly to test focus trap. Modal must remain open and focus must stay inside.
-result: [pending]
+result: pass (after fix 216a0cd — double-Esc surfaced Chromium's close-watcher anti-modal-trap; fixed by adding document-level keydown capture-phase listener that preventDefaults Escape before the close request is generated)
 
 ## Summary
 
 total: 4
-passed: 0
+passed: 1
 issues: 0
-pending: 4
+pending: 3
 skipped: 0
 blocked: 0
 

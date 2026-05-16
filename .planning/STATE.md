@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: ready_to_execute
-stopped_at: "Phase 7 plans complete (3 plans, 3 waves) and round-2 plan-check PASS. Wave 1: 07-01 (handle reservation flow — GET /api/handles/check + HandlePickerModal upgrade to native <dialog> + live debounced check). Wave 2: 07-02 (public reel — GET /api/public/u/:handle + usePublicReel + OrbitReel + GlobeReel + reduced-motion variants + HandleReelRoute rewrite + NotFoundHandleRoute). Wave 3: 07-03 (ops/nginx/timeline.conf — committed only; Phase 8 wires). Plan-checker round 1 found 1 BLOCKER + 4 IMPORTANT, all fixed in 5655148. Round 2 PASS. Ready for /gsd-execute-phase 7."
-last_updated: "2026-05-14T22:50:00.000Z"
-last_activity: 2026-05-14 -- Phase 7 planning complete (RESEARCH 4da9043, PATTERNS df36d95, plans ec2f2e9, round-1 revisions 5655148)
+status: complete
+stopped_at: "Phase 7 complete. All 3 plans shipped. 347/347 tests pass. Round-1 UAT surfaced a Chromium close-watcher anti-modal-trap (double-Esc dismissed the HandlePickerModal); fixed in 216a0cd with a document-level keydown capture-phase listener + regression test (348/348). 3 mobile UAT items (iPhone 60FPS sustained orbit, iOS globe projection rendering, mixed-case URL resolution) deferred to post-Phase-8 deployment QA — they can't be tested locally without HTTPS + prod Auth0 callbacks. Next: Phase 8 manual deploy (DEPLOY-01/02/05)."
+last_updated: "2026-05-15T19:40:00.000Z"
+last_activity: 2026-05-15 -- Phase 7 closed (commits e1dc238..216a0cd; double-Esc UAT fix in 216a0cd)
 progress:
   total_phases: 12
-  completed_phases: 6
-  total_plans: 17
-  completed_plans: 11
-  percent: 65
+  completed_phases: 7
+  total_plans: 20
+  completed_plans: 14
+  percent: 70
 ---
 
 # Project State
@@ -21,25 +21,25 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 7 — public URLs + handle reservation (next; planning not started)
+**Current focus:** Phase 8 — Deploy part 1 (manual deploy via SSH to OCI VM; DNS cutover; certbot)
 
 ## Current Position
 
-Phase: 7 (public-urls-handle) — planned, ready to execute
-Plan: 0 of 3 executed (07-01, 07-02, 07-03 written and verified)
-Status: planning complete. Round-2 plan-check PASS. Next: /gsd-execute-phase 7 (recommend /clear first for fresh context).
-Last activity: 2026-05-13 -- Phase 6 closed (Wave 1 parallel + Wave 2 + Wave 3 — full photo pipeline + reel cycling shipped)
+Phase: 7 (public-urls-handle) — complete
+Plan: 3 of 3 executed (07-01, 07-02, 07-03 shipped + UAT-driven fix 216a0cd)
+Status: Phase 7 closed. Next: /gsd-discuss-phase 8 or /gsd-plan-phase 8.
+Last activity: 2026-05-15 -- Phase 7 closed (commits e1dc238..216a0cd inclusive; 9 phase-internal commits + 1 UAT fix)
 
-Progress: [██████░░░░░░] 50% (6 of 12 phases complete)
+Progress: [███████░░░░░] 58% (7 of 12 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total phases completed: 6
-- Total plans completed: 19 (1 Phase 1, 6 Phase 2 incl. hotfix, 3 Phase 3, 2 Phase 4, 3 Phase 5, 4 Phase 6)
-- Average duration: ~5h25m per phase
-- Total execution time: ~35 hours
+- Total phases completed: 7
+- Total plans completed: 22 (1 Phase 1, 6 Phase 2 incl. hotfix, 3 Phase 3, 2 Phase 4, 3 Phase 5, 4 Phase 6, 3 Phase 7)
+- Average duration: ~5h04m per phase
+- Total execution time: ~38 hours
 
 **By Phase:**
 
@@ -51,6 +51,7 @@ Progress: [██████░░░░░░] 50% (6 of 12 phases complete)
 | 4 (Backend + Auth0) | 2 | ~6h | ~3h | Sequential plans (04-02 depends on 04-01); plan-checker round 1 REVISE (DATA-02 brittle constraint approach + Tasks 5/6 ordering); 3 Auth0 dashboard landmines on first live test |
 | 5 (Cities CRUD + reorder + reel API) | 3 | ~8h | ~2h40 | `superpowers:subagent-driven-development` workflow: fresh implementer subagent per task with two-stage review (spec compliance → code quality) + fix subagent per Important issue. 52 new tests (88 → 140). 8+ review-fix commits caught real bugs pre-merge (Drizzle wrapping, StrictMode mountedRef, concurrent drag race, focus rings, tz drift). 1 mid-Task-2 stream timeout recovered cleanly via fresh-agent resume. DEFERRABLE constraint exercised end-to-end for the first time via two-row swap test |
 | 6 (Photo upload pipeline + REEL-09) | 4 | ~5h | ~1h15 | First use of `superpowers:dispatching-parallel-agents` skill — Wave 1 (06-01 client pipeline + 06-02 server PAR/sharp) ran fully in parallel via disjoint file trees (atomic dep pre-install at 27fdab7 avoided bun.lock race). 95 new tests (140 → 235: 19 client pipeline, 19 server endpoints + MIME sniff, 36 UI components, 21 reel cycling). Plan-checker round 2 REVISE caught 4 blockers pre-execution (silently-dropped locked decisions: full-screen viewer + per-photo delete UI; server MIME byte-sniff missing; 06-04 cross-plan dep). 06-02 agent stream watchdog killed it after work completed but before turn close — atomic-per-task commits made disk verification + recovery trivial. Real OCI bucket provisioning (CORS via S3-compat API only — Native API silent-drop landmine documented in memory). |
+| 7 (Public URLs + handle reservation) | 3 | ~3h | ~1h | 113 new tests (235 → 348: 30 plan 07-01 + 58 plan 07-02 + 0 plan 07-03 config-as-code + 1 UAT-fix regression). TWO mid-plan stream-idle timeouts (~20min each, on 07-01 + 07-02 executor agents) — recovered cleanly via inline completion against atomic-per-task disk state. Stream-timeout pattern now load-bearing: 4 occurrences across phases 5/6/7. Three deviations auto-fixed pre-merge (inverted jsdom polyfill guard; arrow-fn-as-constructor for maplibre mock; comment-text-vs-grep-guard friction for `mountedRef`/`easeTo`/`listen 443` literals — second time this hazard surfaced in one phase). Live UAT caught a Chromium close-watcher anti-modal-trap: double-Esc dismissed the HandlePickerModal even with cancel-preventDefault — fixed with document-level keydown capture-phase listener. 3 mobile UAT items deferred to post-Phase-8 deployment QA (iPhone 60FPS orbit sustain, iOS globe projection rendering, mixed-case URL resolution on the deployed stack). |
 
 **Recent Trend:**
 

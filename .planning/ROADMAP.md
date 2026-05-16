@@ -16,7 +16,7 @@ Twelve weekend phases turn a hardcoded reel prototype into a deployed multi-user
 - [ ] **Phase 4: Backend skeleton + Auth0** - Hono + Drizzle + Postgres + Auth0 wiring (split into 2 plans).
 - [ ] **Phase 5: City CRUD + map picker** - Click map → reverse-geocode → save. Reorder via deferred-unique transaction.
 - [x] **Phase 6: Photo upload pipeline** - HEIC convert, resize, EXIF strip, OCI PAR upload, thumbnails. (4 plans; +95 tests, 140→235; first parallel-agent wave; OCI CORS via S3-compat landmine documented)
-- [ ] **Phase 7: Public URLs + handle reservation** - `/u/:handle` unauthenticated reel, handle picker, Nginx cache.
+- [x] **Phase 7: Public URLs + handle reservation** - `/u/:handle` unauthenticated reel, handle picker, Nginx cache. (3 plans; +58 tests, 289→347 across the phase; double-Esc anti-modal-trap landmine fixed in UAT; 3 mobile UAT items defer to post-Phase-8)
 - [ ] **Phase 8: Deploy part 1** - OCI VM setup, Docker Compose, Nginx + Let's Encrypt, DNS cutover.
 - [ ] **Phase 9: Deploy part 2 + empty/error states** - GitHub Actions CI, tagged auto-deploy, error UX. App live.
 - [ ] **Phase 10: MP4 ladder rung 1 (server-side)** - BullMQ + Puppeteer + FFmpeg. 90s benchmark gate.
@@ -158,13 +158,13 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 07-01-PLAN.md — Handle reservation flow: GET /api/handles/check + HandlePickerModal upgrade (native dialog + live debounced check + URL preview) [AUTH-05/06/07]
+- [x] 07-01-PLAN.md — Handle reservation flow: GET /api/handles/check + HandlePickerModal upgrade (native dialog + live debounced check + URL preview) [AUTH-05/06/07] (completed 2026-05-15; double-Esc anti-modal-trap fix in 216a0cd)
 
 **Wave 2** *(depends on 07-01 for server/index.ts mount-block coordination)*
-- [ ] 07-02-PLAN.md — Public reel: GET /api/public/u/:handle + usePublicReel + HandleReelRoute rewrite + OrbitReel (1-city 45°/s orbit) + GlobeReel (0-city slow globe) + reduced-motion variants + NotFoundHandleRoute [PUBLIC-01/02/03, REEL-08]
+- [x] 07-02-PLAN.md — Public reel: GET /api/public/u/:handle + usePublicReel + HandleReelRoute rewrite + OrbitReel (1-city 45°/s orbit) + GlobeReel (0-city slow globe) + reduced-motion variants + NotFoundHandleRoute [PUBLIC-01/02/03, REEL-08] (completed 2026-05-15)
 
 **Wave 3** *(depends on 07-02 for app-layer Cache-Control header contract)*
-- [ ] 07-03-PLAN.md — ops/nginx/timeline.conf: proxy_cache_path zone + /api/public/u/[^/]+$ + /u/[^/]+$ location blocks + TTL 5m/1m + X-Cache-Status + X-No-Cache bypass (file committed; Phase 8 wires) [PUBLIC-04]
+- [x] 07-03-PLAN.md — ops/nginx/timeline.conf: proxy_cache_path zone + /api/public/u/[^/]+$ + /u/[^/]+$ location blocks + TTL 5m/1m + X-Cache-Status + X-No-Cache bypass (file committed; Phase 8 wires) [PUBLIC-04] (completed 2026-05-15)
 
 ### Phase 8: Deploy part 1
 **Goal**: First public live domain. Manual deploy via SSH. OCI VM provisioned, Docker Compose stack running, TLS auto-renewing.
