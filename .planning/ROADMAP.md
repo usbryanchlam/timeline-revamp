@@ -178,7 +178,7 @@ Plans:
 **Plans**: 3 plans (TBD)
 
 Plans:
-- [ ] 08-01: OCI VM provisioning + Docker Compose stack
+- [x] 08-01: OCI VM provisioning + Docker Compose stack
 - [ ] 08-02: Nginx reverse proxy + Let's Encrypt
 - [ ] 08-03: DNS cutover + smoke test
 
