@@ -156,6 +156,104 @@ container is already serving the Vite SPA at `GET /` (via Hono
 Encrypt setup that exposes this to the public internet; Phase 08-03 owns
 DNS cutover and the smoke battery.
 
+## Nginx + Let's Encrypt
+
+After the API stack is healthy on `127.0.0.1:8787` (per First Deployment), wire up the reverse proxy.
+
+### Prerequisites
+- 08-01 stack is up and `curl -sf http://127.0.0.1:8787/api/health` returns `{"status":"ok","db":"ok"}`.
+- 08-01 stack also serves the Vite bundle: `docker compose exec api wget -qO- http://localhost:8787/ | head -1` returns an HTML doctype line (Hono `serveStatic` mount working).
+- tcp/80 and tcp/443 are reachable from the public internet (OCI VCN Security List + host iptables, both per `infra/setup.sh`).
+- DNS A record for `timeline.bryanlam.dev` is NOT yet pointing at this VM. We verify TLS works via `curl --resolve` first (D-19 sequencing).
+
+### Steps
+
+1. Update the repo:
+   ```bash
+   cd /opt/timeline-revamp && git pull
+   ```
+
+2. Symlink the Nginx config (D-02):
+   ```bash
+   sudo ln -sf /opt/timeline-revamp/ops/nginx/timeline.conf /etc/nginx/conf.d/timeline.conf
+   ls -l /etc/nginx/conf.d/timeline.conf
+   ```
+
+3. Disable the default site to prevent certbot picking the wrong server block:
+   ```bash
+   sudo rm -f /etc/nginx/sites-enabled/default
+   ```
+
+4. Validate + enable Nginx:
+   ```bash
+   sudo nginx -t
+   sudo systemctl enable --now nginx
+   ```
+
+5. Run certbot --nginx (first-run, interactive):
+   ```bash
+   sudo certbot --nginx \
+     -d timeline.bryanlam.dev \
+     --email <your-email> \
+     --agree-tos \
+     --no-eff-email \
+     --redirect
+   ```
+   The `--redirect` flag injects the HTTP->HTTPS 301 (D-06).
+
+6. Verify cert + renewal (D-03):
+   ```bash
+   sudo certbot certificates
+   sudo certbot renew --dry-run
+   sudo systemctl is-active certbot.timer
+   sudo systemctl is-enabled certbot.timer
+   ```
+
+7. Pre-DNS TLS smoke (D-19 — run from laptop, NOT the VM):
+   ```bash
+   curl --resolve timeline.bryanlam.dev:443:<vm-ip> -fI https://timeline.bryanlam.dev/api/health
+   openssl s_client -connect <vm-ip>:443 -servername timeline.bryanlam.dev </dev/null \
+     | openssl x509 -noout -dates -issuer
+   ```
+   Both must succeed BEFORE the DNS cutover in 08-03.
+
+8. Pre-DNS /assets/ cache-header smoke (proves the Hono `serveStatic` + Nginx cache-overlay handshake works — see the `/assets/` location block in `ops/nginx/timeline.conf`):
+   ```bash
+   # On the VM, discover an asset filename:
+   ASSET=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api \
+     ls /app/dist/assets/ | grep -E 'index-.*\.js$' | head -1 | tr -d '\r')
+   # On the laptop:
+   curl --resolve timeline.bryanlam.dev:443:<vm-ip> -fI \
+     https://timeline.bryanlam.dev/assets/$ASSET
+   ```
+   Expected headers (case-insensitive header names): `HTTP/2 200`,
+   `cache-control: public, immutable`, `expires: <date ~1y out>`,
+   `content-type: text/javascript` (or `application/javascript`).
+
+9. Commit certbot's auto-injected lines back to the repo (Option A from 08-RESEARCH Pattern 4):
+   ```bash
+   cd /opt/timeline-revamp
+   git diff ops/nginx/timeline.conf
+   git add ops/nginx/timeline.conf
+   git commit -m 'chore(infra): commit certbot --nginx auto-injected TLS directives'
+   git push
+   ```
+   This keeps the repo as the source of truth. Re-deploying to a fresh VM would re-issue a fresh cert via `certbot --nginx` (the symlink + the pre-injected directives play nicely because certbot is idempotent on already-managed files).
+
+### Troubleshooting
+
+- **`nginx -t` reports duplicate server_name:** The default site is still enabled. Re-run step 3.
+- **certbot reports "DNS problem: NXDOMAIN looking up A for timeline.bryanlam.dev":** This is the D-19 race — you flipped DNS too early, or it has not yet propagated. Wait (or run with `--manual` and the DNS-01 challenge if you must issue before DNS is ready, but HTTP-01 + the curl --resolve path is the recommended sequence).
+- **certbot reports "Connection refused" during HTTP-01 challenge:** Either Nginx is not running (`sudo systemctl status nginx`), or tcp/80 is not reachable from the public internet. Check OCI VCN Security List AND host iptables. RESEARCH Pitfall 5 has the iptables verification recipe.
+- **`curl --resolve` returns 502 Bad Gateway:** The Nginx upstream is correct (127.0.0.1:8787) but the API container is not running. `docker compose -f docker-compose.yml -f docker-compose.prod.yml ps` should show api as `(healthy)`.
+- **`/assets/<hash>.js` returns 404:** The Hono `serveStatic` mount in `server/index.ts` did not land (08-01 regression). Verify on the VM: `docker compose exec api wget -qO- http://localhost:8787/assets/<hash>.js | head -1` should return JS bytes. If THAT 404s too, the Dockerfile did not COPY `/app/dist` correctly or the `serveStatic` import is broken — see 08-01 Task 1 Part C.
+- **`/assets/<hash>.js` returns 200 but no `cache-control: public, immutable` header:** The /assets/ location block's `add_header ... always;` line is missing or malformed. Re-verify Task 1 of 08-02.
+- **Subsequent git pull overwrites certbot's edits:** The repo is the source of truth post-commit-back; future `git pull` operations preserve the TLS block. If a future contributor edits `timeline.conf` and pushes WITHOUT the TLS block, the next `git pull` on the VM would remove it — run `sudo nginx -t` after every pull (per the standard symlink-update loop, D-02 / RESEARCH Pattern 5).
+
+### Renewal Behavior
+
+`certbot.timer` runs twice daily with jitter; if the cert is within 30 days of expiry, certbot renews and runs an `nginx -s reload` (the apt package's deploy-hook). No manual intervention needed for v1.
+
 ## Common Operations
 
 **Ship a new version** (the canonical ship loop, per ROADMAP §"Phase 8"):
