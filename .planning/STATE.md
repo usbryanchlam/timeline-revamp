@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: ready_to_execute
-stopped_at: "Phase 8 planned. 3 plans across 3 sequential waves (08-01 VM+Compose, 08-02 Nginx+LE, 08-03 DNS+smoke). Plan checker iterated twice (initial: 2 BLOCKERs + 4 WARNINGs surfaced static-asset serving contradiction and missing ROADMAP edit; revision 1: all 5 fixes verified, no regressions). 17 distinct tasks across the 3 plans (Wave 0 RED test for /api/health + 4 W1 tasks + 3 W2 tasks + 3 W3 tasks). 08-VALIDATION.md status: ready, nyquist_compliant: true. ROADMAP.md SC1 will be edited in 08-01 Task 3 to reflect Redis defer (D-08). Smoke battery in 08-03 closes the 3 deferred Phase 7 mobile UAT items. Next: /gsd-execute-phase 8."
-last_updated: "2026-05-15T20:40:00.000Z"
-last_activity: 2026-05-15 -- Phase 8 planned (commits ce29525, 7b3f59c, 1c979f3)
+status: executing
+stopped_at: "Phase 6 plan 06-02 complete. Commits: ca8051e (task 1), 1b7ac6b (task 2), b463c7b (task 3). All 178 tests pass. Typecheck clean. Live DB migrated to photos_v2 schema. `main` at `a43aabc` (origin synced). Three plans landed (05-01 read-side, 05-02 write-side, 05-03 reorder + REEL-09 + reel switch). 140/140 tests pass. Frontend + server typecheck green. User completed live UAT on browser: full city CRUD + drag reorder + reel-on-API-data. Two UAT bugs surfaced and fixed (mountedRef StrictMode, pin design-doc compliance)."
+last_updated: "2026-05-16T03:54:26.556Z"
+last_activity: 2026-05-16 -- Phase 08 execution started
 progress:
   total_phases: 12
-  completed_phases: 7
-  total_plans: 20
-  completed_plans: 14
-  percent: 70
+  completed_phases: 5
+  total_plans: 23
+  completed_plans: 15
+  percent: 65
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 8 — Deploy part 1 (manual deploy via SSH to OCI VM; DNS cutover; certbot)
+**Current focus:** Phase 08 — deploy-part-1
 
 ## Current Position
 
-Phase: 8 (deploy-part-1) — ready to execute
-Plan: 0 of 3 executed; 3 plans + research + validation all green (commits ce29525, 7b3f59c, 1c979f3)
-Status: Plan checker PASSED on iteration 2. Next: /gsd-execute-phase 8.
-Last activity: 2026-05-15 -- Phase 8 planned, plan checker passed (commit 1c979f3)
+Phase: 08 (deploy-part-1) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 08
+Last activity: 2026-05-16 -- Phase 08 execution started
 
 Progress: [███████░░░░░] 58% (7 of 12 phases complete)
 
