@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: complete
-stopped_at: "Phase 7 complete. All 3 plans shipped. 347/347 tests pass. Round-1 UAT surfaced a Chromium close-watcher anti-modal-trap (double-Esc dismissed the HandlePickerModal); fixed in 216a0cd with a document-level keydown capture-phase listener + regression test (348/348). 3 mobile UAT items (iPhone 60FPS sustained orbit, iOS globe projection rendering, mixed-case URL resolution) deferred to post-Phase-8 deployment QA — they can't be tested locally without HTTPS + prod Auth0 callbacks. Next: Phase 8 manual deploy (DEPLOY-01/02/05)."
-last_updated: "2026-05-15T19:40:00.000Z"
-last_activity: 2026-05-15 -- Phase 7 closed (commits e1dc238..216a0cd; double-Esc UAT fix in 216a0cd)
+status: planning
+stopped_at: "Phase 8 context gathered. 4 areas locked across 13 decisions (D-01..D-19): host-installed Nginx + certbot --nginx with Phase 7's timeline.conf symlinked in; Docker Compose API (Bun runtime) + Postgres only (Redis deferred to Phase 10); /opt/timeline-revamp owned by ubuntu, single .env via SCP; smoke test = bare TLS/health/renew + 3 deferred Phase 7 mobile UAT items. mykb (`/Users/bryanlam/Workspaces/mykb`) is the canonical reference for the host-install + iptables + /opt/<app> pattern. Diverges on proxy (Nginx not Caddy, to preserve Phase 7 proxy_cache work) and runtime (Docker Compose not PM2). Next: /gsd-plan-phase 8."
+last_updated: "2026-05-15T20:00:00.000Z"
+last_activity: 2026-05-15 -- Phase 8 context captured (commit ce29525)
 progress:
   total_phases: 12
   completed_phases: 7
@@ -25,10 +25,10 @@ See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 ## Current Position
 
-Phase: 7 (public-urls-handle) — complete
-Plan: 3 of 3 executed (07-01, 07-02, 07-03 shipped + UAT-driven fix 216a0cd)
-Status: Phase 7 closed. Next: /gsd-discuss-phase 8 or /gsd-plan-phase 8.
-Last activity: 2026-05-15 -- Phase 7 closed (commits e1dc238..216a0cd inclusive; 9 phase-internal commits + 1 UAT fix)
+Phase: 8 (deploy-part-1) — planning
+Plan: 0 of 3 (08-CONTEXT.md captured at ce29525; 08-RESEARCH.md + 08-01..08-03-PLAN.md TBD)
+Status: Phase 8 context locked. Next: /gsd-plan-phase 8.
+Last activity: 2026-05-15 -- Phase 8 context captured (commit ce29525)
 
 Progress: [███████░░░░░] 58% (7 of 12 phases complete)
 
