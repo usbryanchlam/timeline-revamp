@@ -171,7 +171,7 @@ Plans:
 **Depends on**: Phase 7
 **Requirements**: DEPLOY-01, DEPLOY-02, DEPLOY-05
 **Success Criteria** (what must be TRUE):
-  1. OCI Ampere A1 VM (≥ 2 OCPU, ≥ 8 GB) running Docker Compose with API + Postgres + Redis + Nginx.
+  1. OCI Ampere A1 VM (≥ 2 OCPU, ≥ 8 GB) running Docker Compose with API + Postgres + Nginx (Redis deferred to Phase 10 per 08-CONTEXT D-08).
   2. `https://timeline.bryanlam.dev` resolves with valid Let's Encrypt cert.
   3. `certbot renew --dry-run` succeeds.
   4. Manual `git pull && docker compose up -d --build` ships a new version.
