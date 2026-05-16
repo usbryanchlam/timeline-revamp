@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: planning
-stopped_at: "Phase 8 context gathered. 4 areas locked across 13 decisions (D-01..D-19): host-installed Nginx + certbot --nginx with Phase 7's timeline.conf symlinked in; Docker Compose API (Bun runtime) + Postgres only (Redis deferred to Phase 10); /opt/timeline-revamp owned by ubuntu, single .env via SCP; smoke test = bare TLS/health/renew + 3 deferred Phase 7 mobile UAT items. mykb (`/Users/bryanlam/Workspaces/mykb`) is the canonical reference for the host-install + iptables + /opt/<app> pattern. Diverges on proxy (Nginx not Caddy, to preserve Phase 7 proxy_cache work) and runtime (Docker Compose not PM2). Next: /gsd-plan-phase 8."
-last_updated: "2026-05-15T20:00:00.000Z"
-last_activity: 2026-05-15 -- Phase 8 context captured (commit ce29525)
+status: ready_to_execute
+stopped_at: "Phase 8 planned. 3 plans across 3 sequential waves (08-01 VM+Compose, 08-02 Nginx+LE, 08-03 DNS+smoke). Plan checker iterated twice (initial: 2 BLOCKERs + 4 WARNINGs surfaced static-asset serving contradiction and missing ROADMAP edit; revision 1: all 5 fixes verified, no regressions). 17 distinct tasks across the 3 plans (Wave 0 RED test for /api/health + 4 W1 tasks + 3 W2 tasks + 3 W3 tasks). 08-VALIDATION.md status: ready, nyquist_compliant: true. ROADMAP.md SC1 will be edited in 08-01 Task 3 to reflect Redis defer (D-08). Smoke battery in 08-03 closes the 3 deferred Phase 7 mobile UAT items. Next: /gsd-execute-phase 8."
+last_updated: "2026-05-15T20:40:00.000Z"
+last_activity: 2026-05-15 -- Phase 8 planned (commits ce29525, 7b3f59c, 1c979f3)
 progress:
   total_phases: 12
   completed_phases: 7
@@ -25,10 +25,10 @@ See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 ## Current Position
 
-Phase: 8 (deploy-part-1) — planning
-Plan: 0 of 3 (08-CONTEXT.md captured at ce29525; 08-RESEARCH.md + 08-01..08-03-PLAN.md TBD)
-Status: Phase 8 context locked. Next: /gsd-plan-phase 8.
-Last activity: 2026-05-15 -- Phase 8 context captured (commit ce29525)
+Phase: 8 (deploy-part-1) — ready to execute
+Plan: 0 of 3 executed; 3 plans + research + validation all green (commits ce29525, 7b3f59c, 1c979f3)
+Status: Plan checker PASSED on iteration 2. Next: /gsd-execute-phase 8.
+Last activity: 2026-05-15 -- Phase 8 planned, plan checker passed (commit 1c979f3)
 
 Progress: [███████░░░░░] 58% (7 of 12 phases complete)
 
