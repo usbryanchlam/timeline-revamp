@@ -1,10 +1,11 @@
 ---
 phase: 08
 slug: deploy-part-1
-status: draft
-nyquist_compliant: false
+status: ready
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-05-15
+updated: 2026-05-15
 ---
 
 # Phase 08 — Validation Strategy
@@ -68,6 +69,8 @@ created: 2026-05-15
 - [ ] `server/routes/health.test.ts` — NEW. Stubs for DEPLOY-01 health endpoint + DB ping. Mock `db.execute(sql\`select 1\`)` to return success / throw; assert 200/503 + correct JSON body. ~6-8 test cases (db_ok, db_throws, malformed_response, no_db_configured).
 - [ ] Existing infrastructure (vitest + db.test seam patterns from Phase 4-6) covers the rest — no new framework install needed.
 
+Wave 0 is now PLANNED in 08-01 Task 0 (`server/routes/health.test.ts`). The `wave_0_complete: false` frontmatter flag remains because the task has not yet executed (it is the first step of plan execution); it flips to `true` after Task 0's RED test ships.
+
 ---
 
 ## Manual-Only Verifications
@@ -90,11 +93,11 @@ created: 2026-05-15
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify OR are explicitly Manual-Only with a runbook command
-- [ ] Sampling continuity: the 1 automatable task (`/api/health` unit tests) gates the rest; no 3 consecutive automated tasks without verify because the phase has only 2 automated tasks total
-- [ ] Wave 0 covers the single MISSING reference (`server/routes/health.test.ts`)
-- [ ] No watch-mode flags used in commands
-- [ ] Feedback latency < 5s for automated layer; manual layer fires once at phase gate
-- [ ] `nyquist_compliant: true` set in frontmatter (after planner converts this draft)
+- [x] All tasks have `<automated>` verify OR are explicitly Manual-Only with a runbook command
+- [x] Sampling continuity: the 1 automatable task (`/api/health` unit tests) gates the rest; no 3 consecutive automated tasks without verify because the phase has only 2 automated tasks total
+- [x] Wave 0 covers the single MISSING reference (`server/routes/health.test.ts`) — planned in 08-01 Task 0
+- [x] No watch-mode flags used in commands
+- [x] Feedback latency < 5s for automated layer; manual layer fires once at phase gate
+- [x] `nyquist_compliant: true` set in frontmatter (post-revision 2026-05-15)
 
-**Approval:** pending
+**Approval:** approved 2026-05-15
