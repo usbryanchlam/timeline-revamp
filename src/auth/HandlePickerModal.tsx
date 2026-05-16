@@ -46,10 +46,26 @@ export function HandlePickerModal({ onPicked }: { onPicked: (handle: string) => 
     const d = dialogRef.current;
     if (!d) return;
     if (!d.open) d.showModal();
-    const onCancel = (e: Event) => e.preventDefault(); // D-01 blocking — Esc cannot dismiss.
+    // D-01 blocking — Esc cannot dismiss. Two listeners are needed:
+    //   1. `cancel` preventDefault catches the first Esc (standard path).
+    //   2. `keydown` in the document-level capture phase catches every Esc
+    //      BEFORE the browser's close-watcher logic runs. Chromium's close
+    //      watcher implements an anti-modal-trap rule: when a `cancel` event
+    //      is preventDefault'd, the NEXT close request closes the dialog
+    //      anyway. Capturing the keydown stops the close request from ever
+    //      being generated.
+    const onCancel = (e: Event) => e.preventDefault();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && d.open) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
     d.addEventListener('cancel', onCancel);
+    document.addEventListener('keydown', onKeyDown, true);
     return () => {
       d.removeEventListener('cancel', onCancel);
+      document.removeEventListener('keydown', onKeyDown, true);
       if (d.open) d.close();
     };
   }, []);

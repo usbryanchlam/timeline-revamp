@@ -114,6 +114,26 @@ describe('HandlePickerModal', () => {
     expect(dialog.hasAttribute('open')).toBe(true);
   });
 
+  it('intercepts Escape keydown in document capture phase (double-Esc anti-modal-trap fix)', () => {
+    render(<HandlePickerModal onPicked={() => {}} />);
+    const dialog = getDialog();
+    expect(dialog.hasAttribute('open')).toBe(true);
+    // Real browser regression: Chromium's close watcher closes the dialog on
+    // the SECOND Esc press even when the first cancel event was prevented.
+    // The fix is a document-level keydown listener in capture phase that
+    // preventDefaults the key before the close request is generated.
+    const keyEvent = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      cancelable: true,
+      bubbles: true,
+    });
+    act(() => {
+      document.dispatchEvent(keyEvent);
+    });
+    expect(keyEvent.defaultPrevented).toBe(true);
+    expect(dialog.hasAttribute('open')).toBe(true);
+  });
+
   it('renders the URL preview line `timeline.bryanlam.dev/u/<input>`', () => {
     render(<HandlePickerModal onPicked={() => {}} />);
     // With empty input, preview shows the placeholder token "<input>".
