@@ -254,6 +254,152 @@ After the API stack is healthy on `127.0.0.1:8787` (per First Deployment), wire 
 
 `certbot.timer` runs twice daily with jitter; if the cert is within 30 days of expiry, certbot renews and runs an `nginx -s reload` (the apt package's deploy-hook). No manual intervention needed for v1.
 
+## DNS Cutover
+
+Pre-flight requirement: 08-02's `curl --resolve` smoke MUST return HTTP/2 200 BEFORE running these steps. If it does not, fix Nginx / certbot first -- this section assumes a valid cert is on the VM (D-19).
+
+### Pre-cutover (24 hours ahead)
+
+1. **Lower TTL** on the existing DNS zone for `bryanlam.dev` to 300 seconds. This ensures a botched cutover propagates back within ~5 minutes instead of hours. Skip if TTL is already 300s or lower. Verify with:
+   ```bash
+   dig +short timeline.bryanlam.dev @1.1.1.1
+   dig +noall +answer timeline.bryanlam.dev @1.1.1.1
+   ```
+
+   **Cloudflare / proxied-DNS branch:** If the bryanlam.dev zone is hosted on Cloudflare (or any provider that offers an "orange cloud" proxy mode), ALSO set the `timeline` A record to **DNS only** (gray cloud). Proxied mode would re-terminate TLS at the provider's edge and break the Let's Encrypt chain that 08-02 issued on the VM.
+
+### Cutover
+
+2. **Verify the VM IP is a Reserved Public IP** (not a dynamic ephemeral IP). On the OCI Console: Networking -> Reserved Public IPs -> confirm the IP attached to the VM's VNIC has `Lifecycle State: Available` and is `Assigned` to the primary VNIC. CLI alternative:
+   ```bash
+   oci network public-ip get --public-ip-id <ocid> --query 'data.{state:"lifecycle-state",assigned:"assigned-entity-id"}'
+   ```
+   If the VM is on a dynamic IP, attach a reserved public IP NOW (free on OCI free tier) before continuing -- otherwise the IP changes on next stop/start and DNS breaks.
+
+3. **Pre-flight TLS smoke from laptop** (last check before flipping DNS):
+   ```bash
+   VM_IP=<vm-ip>
+   curl --resolve timeline.bryanlam.dev:443:$VM_IP -fI https://timeline.bryanlam.dev/api/health
+   openssl s_client -connect $VM_IP:443 -servername timeline.bryanlam.dev </dev/null 2>/dev/null \
+     | openssl x509 -noout -dates -issuer
+   ```
+   Expected: 200 + valid LE chain. If not, STOP -- 08-02 is not finished.
+
+4. **Flip the DNS A record** at the bryanlam.dev DNS provider:
+   - Type: `A`
+   - Name: `timeline` (or `timeline.bryanlam.dev` depending on the provider's UI convention)
+   - Value: the VM's reserved public IP
+   - TTL: 300
+
+5. **Wait for propagation + verify from multiple resolvers:**
+   ```bash
+   dig +short timeline.bryanlam.dev @1.1.1.1
+   dig +short timeline.bryanlam.dev @8.8.8.8
+   dig +short timeline.bryanlam.dev @9.9.9.9
+   ```
+   All three should return the VM IP. If one resolver lags, wait another 1-2 minutes (300s TTL means ~5 min max).
+
+6. **Update Auth0 production callback URL** (per 08-RESEARCH Runtime State Inventory):
+   - Auth0 dashboard -> Applications -> Timeline SPA -> Settings
+   - Allowed Callback URLs: add `https://timeline.bryanlam.dev/app`
+   - Allowed Logout URLs: add `https://timeline.bryanlam.dev`
+   - Allowed Web Origins: add `https://timeline.bryanlam.dev`
+   - Save changes.
+
+7. **Verify OCI Object Storage CORS** (per memory `feedback_oci_cors_via_s3.md` -- OCI Console UI has no CORS tab; the Native API silently drops `corsRules`):
+   ```bash
+   aws s3api get-bucket-cors \
+     --bucket timeline-photos \
+     --endpoint-url https://<namespace>.compat.objectstorage.<region>.oraclecloud.com
+   ```
+   `AllowedOrigins` MUST include `https://timeline.bryanlam.dev`. If missing, re-apply via the S3-compat `put-bucket-cors` operation -- NOT the OCI Console UI, NOT the Native API (both silently drop the rules).
+
+## Smoke Test
+
+Closes DEPLOY-05 + the 3 deferred Phase 7 mobile UAT items per D-16. After this section's gates pass, Phase 8 is done.
+
+### Bare automated battery
+
+Run from the laptop (NOT on the VM -- the public hostname must resolve via DNS):
+
+1. **Health endpoint reachable via public hostname:**
+   ```bash
+   curl -fsS https://timeline.bryanlam.dev/api/health | jq
+   ```
+   Expected output:
+   ```json
+   {"status":"ok","db":"ok"}
+   ```
+
+2. **TLS chain valid + future expiry:**
+   ```bash
+   openssl s_client -connect timeline.bryanlam.dev:443 -servername timeline.bryanlam.dev </dev/null 2>/dev/null \
+     | openssl x509 -noout -dates -issuer -subject
+   ```
+   Expected: `issuer=...Let's Encrypt...`, `notAfter=<date ~90 days out>`.
+
+3. **Renewal still works post-DNS:**
+   ```bash
+   ssh ubuntu@<vm> 'sudo certbot renew --dry-run'
+   ```
+   Expected: exit 0 + "Congratulations, all simulated renewals succeeded".
+
+4. **certbot.timer still active:**
+   ```bash
+   ssh ubuntu@<vm> 'systemctl is-active certbot.timer && systemctl is-enabled certbot.timer'
+   ```
+   Expected: `active\nenabled\n`.
+
+5. **HTTP -> HTTPS redirect works:**
+   ```bash
+   curl -fI http://timeline.bryanlam.dev/api/health
+   ```
+   Expected: `HTTP/1.1 301 Moved Permanently`, `Location: https://timeline.bryanlam.dev/api/health`.
+
+6. **First authenticated login round-trip succeeds:**
+   Open `https://timeline.bryanlam.dev/app` in a browser. Click Sign In. Auth0 Universal Login renders. After login, the browser lands back on `https://timeline.bryanlam.dev/app` with a valid session. (If Auth0 redirects to an error page, the callback whitelist from DNS Cutover step 6 is missing or wrong.)
+
+### Mobile UAT (real iPhone 14 Pro, iOS 17+, Safari)
+
+These three items close Phase 7's UAT debt (`07-HUMAN-UAT.md`). Use a real iPhone -- the device-specific GPU + WebGL + globe-projection rendering paths cannot be simulated. Connect the phone to a Mac via USB for Web Inspector access.
+
+7. **UAT-1: iPhone Safari sustains 60 FPS on 1-city OrbitReel for 30s+:**
+   - Setup: stage a single-city test handle (e.g. `bryanlam-test-1city`) with exactly one city. If no such handle exists, sign in on the laptop, add one city, log out, and use that handle.
+   - Visit `https://timeline.bryanlam.dev/u/<1-city-handle>` on iPhone Safari.
+   - On Mac: Safari -> Develop -> <iPhone Name> -> select the page tab.
+   - Open Web Inspector -> Timelines tab -> Rendering Frames -> Start.
+   - Observe for 30+ seconds.
+   - Pass criterion: all (or essentially all -- transient spikes during the very first second of orbit start are acceptable) bars stay BELOW the 16.67ms (60 FPS) target line.
+   - Deviation note: if observed FPS dips on an older device than iPhone 14 Pro (e.g. an iPhone 12 or earlier), log the device model + observed FPS in the SUMMARY and flag for Phase 12 polish -- the 60 FPS expected criterion is "iPhone 14 Pro" specifically, not a blanket all-iOS guarantee.
+
+8. **UAT-2: GlobeReel renders as an actual 3D globe on iOS Safari:**
+   - Setup: stage a 0-city handle (no cities).
+   - Visit `https://timeline.bryanlam.dev/u/<0-city-handle>` on iPhone Safari.
+   - Pass criterion: visually confirm the globe is SPHERICAL -- continents curve toward the poles (not a flat mercator projection). The slow 10 deg/s rotation should be visible.
+
+9. **UAT-3: Mixed-case URL `/u/Bryan` resolves same as `/u/bryan` + Nginx per-URL cache (Phase 7 D-21):**
+   - Setup: use the existing handle (e.g. `bryan`).
+   - Visit `https://timeline.bryanlam.dev/u/Bryan` on iPhone Safari -> same reel renders.
+   - Visit `https://timeline.bryanlam.dev/u/bryan` on iPhone Safari -> same reel renders.
+   - From laptop, verify Nginx per-URL caching:
+     ```bash
+     # First request -- expect cold cache:
+     curl -sI https://timeline.bryanlam.dev/u/Bryan | grep -iE 'X-Cache-Status'
+     # Wait 1-2 seconds, second request -- expect warm cache:
+     curl -sI https://timeline.bryanlam.dev/u/Bryan | grep -iE 'X-Cache-Status'
+     ```
+     First should print `x-cache-status: MISS`; second `x-cache-status: HIT`. The intentional per-URL cache key (`$scheme$host$uri`) means `/u/Bryan` and `/u/bryan` are SEPARATE cache entries -- both should serve the same content, both should flip MISS -> HIT independently.
+   - Pass criterion: both URLs render the same reel; X-Cache-Status flips MISS -> HIT on the second request to the same URL.
+
+### Photos load over CORS
+
+10. **Real photo load smoke** (catches the RESEARCH Pitfall 3 ESM/require regression + Pitfall 2 VITE_* env regression + OCI CORS regression):
+    - Visit `https://timeline.bryanlam.dev/u/<handle-with-photos>` from iPhone Safari.
+    - Scroll through the reel.
+    - Pass criterion: photos appear in the chapter overlays (no broken-image icons; no CORS error entries in iPhone Safari Web Inspector -> Console).
+
+After ALL TEN gates pass, Phase 8 is complete. Update `.planning/phases/07-public-urls-handle/07-HUMAN-UAT.md` to mark items 1/2/3 as `pass`.
+
 ## Common Operations
 
 **Ship a new version** (the canonical ship loop, per ROADMAP §"Phase 8"):
