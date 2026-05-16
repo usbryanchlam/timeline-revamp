@@ -179,7 +179,7 @@ Plans:
 
 Plans:
 - [x] 08-01: OCI VM provisioning + Docker Compose stack
-- [ ] 08-02: Nginx reverse proxy + Let's Encrypt
+- [x] 08-02: Nginx reverse proxy + Let's Encrypt
 - [ ] 08-03: DNS cutover + smoke test
 
 ### Phase 9: Deploy part 2 + empty/error states
