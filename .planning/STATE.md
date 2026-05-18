@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
 status: executing
-stopped_at: "Phase 6 plan 06-02 complete. Commits: ca8051e (task 1), 1b7ac6b (task 2), b463c7b (task 3). All 178 tests pass. Typecheck clean. Live DB migrated to photos_v2 schema. `main` at `a43aabc` (origin synced). Three plans landed (05-01 read-side, 05-02 write-side, 05-03 reorder + REEL-09 + reel switch). 140/140 tests pass. Frontend + server typecheck green. User completed live UAT on browser: full city CRUD + drag reorder + reel-on-API-data. Two UAT bugs surfaced and fixed (mountedRef StrictMode, pin design-doc compliance)."
-last_updated: "2026-05-18T03:22:29.589Z"
+stopped_at: Phase 08.1 context gathered
+last_updated: "2026-05-18T03:44:20.900Z"
 last_activity: 2026-05-16 -- Phase 08 execution started
 progress:
   total_phases: 13
@@ -176,8 +176,8 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-05-12
-Stopped at: Phase 6 plan 06-02 complete. Commits: ca8051e (task 1), 1b7ac6b (task 2), b463c7b (task 3). All 178 tests pass. Typecheck clean. Live DB migrated to photos_v2 schema. `main` at `a43aabc` (origin synced). Three plans landed (05-01 read-side, 05-02 write-side, 05-03 reorder + REEL-09 + reel switch). 140/140 tests pass. Frontend + server typecheck green. User completed live UAT on browser: full city CRUD + drag reorder + reel-on-API-data. Two UAT bugs surfaced and fixed (mountedRef StrictMode, pin design-doc compliance).
+Last session: 2026-05-18T03:44:20.895Z
+Stopped at: Phase 08.1 context gathered
 
 **Next action**: Plan Phase 6 (Photo upload pipeline). ROADMAP goal: iPhone HEIC files converted to JPEG client-side, resized to 2048px max longest-edge, EXIF stripped, uploaded to OCI Object Storage via PAR, thumbnails generated server-side, photo detail sheet opens on overlay tap.
 
