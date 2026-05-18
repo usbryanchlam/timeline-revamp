@@ -81,6 +81,7 @@ Requirements for v1 launch. Each maps to roadmap phases.
 - [ ] **DEPLOY-04**: Tagged-release auto-deploy to VM (manual SSH for W8, automated by W9).
 - [ ] **DEPLOY-05**: DNS for `timeline.bryanlam.dev` cuts over to OCI VM.
 - [ ] **DEPLOY-06**: Production health endpoint + request logging + error middleware on Hono API.
+- [ ] **DEPLOY-07**: Infrastructure reproducible via `terraform apply`; no clickops in OCI Console for provisioning.
 
 ### ERR — Empty / error states
 
@@ -155,17 +156,20 @@ Mapping of requirements to roadmap phases. Updated as `ROADMAP.md` evolves.
 | DATA-05..07 | Phase 6 (W6) | Pending |
 | PUBLIC-01..04 | Phase 7 (W7) | Pending |
 | PUBLIC-05..06 | Phase 12 (W12) | Pending |
-| DEPLOY-01..02 | Phase 8 (W8) | Pending |
-| DEPLOY-03..06 | Phase 9 (W9) | Pending |
+| DEPLOY-01 | Phase 08.1 (re-scoped, TF) + Phase 8 (W8 cutover) | Pending |
+| DEPLOY-02 | Phase 8 (W8) | Pending |
+| DEPLOY-03 | Phase 08.1 (TF CI) + Phase 9 (app-code CI) | Pending |
+| DEPLOY-04..06 | Phase 9 (W9) | Pending |
+| DEPLOY-07 | Phase 08.1 | Pending |
 | ERR-01..04 | Phase 9 (W9) | Pending |
 | MP4-01..03 | Phase 10 (W10) | Pending |
 | MP4-04..06 | Phase 11 (W11) | Pending |
 
 **Coverage:**
-- v1 requirements: 50 total
-- Mapped to phases: 50
+- v1 requirements: 51 total
+- Mapped to phases: 51
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-27*
-*Last updated: 2026-04-27 after import from docs/plan.md*
+*Last updated: 2026-05-15 — added DEPLOY-07 (TF reproducibility) for Phase 08.1*
