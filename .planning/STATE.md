@@ -4,14 +4,14 @@ milestone: v1.0.0
 milestone_name: milestone
 status: executing
 stopped_at: "Phase 6 plan 06-02 complete. Commits: ca8051e (task 1), 1b7ac6b (task 2), b463c7b (task 3). All 178 tests pass. Typecheck clean. Live DB migrated to photos_v2 schema. `main` at `a43aabc` (origin synced). Three plans landed (05-01 read-side, 05-02 write-side, 05-03 reorder + REEL-09 + reel switch). 140/140 tests pass. Frontend + server typecheck green. User completed live UAT on browser: full city CRUD + drag reorder + reel-on-API-data. Two UAT bugs surfaced and fixed (mountedRef StrictMode, pin design-doc compliance)."
-last_updated: "2026-05-16T03:54:26.556Z"
+last_updated: "2026-05-18T03:22:29.589Z"
 last_activity: 2026-05-16 -- Phase 08 execution started
 progress:
-  total_phases: 12
+  total_phases: 13
   completed_phases: 5
   total_plans: 23
-  completed_plans: 15
-  percent: 65
+  completed_plans: 17
+  percent: 74
 ---
 
 # Project State
@@ -69,6 +69,10 @@ Progress: [███████░░░░░] 58% (7 of 12 phases complete)
 *Updated after each phase completion*
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 08.1 inserted after Phase 8: infra-terraform (TF-first OCI provisioning before Phase 8 DNS cutover) (URGENT)
 
 ### Decisions
 

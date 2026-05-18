@@ -182,6 +182,16 @@ Plans:
 - [x] 08-02: Nginx reverse proxy + Let's Encrypt
 - [ ] 08-03: DNS cutover + smoke test
 
+### Phase 08.1: infra-terraform (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 08.1 to break down)
+
 ### Phase 9: Deploy part 2 + empty/error states
 **Goal**: GitHub Actions CI builds + auto-deploys on tag. Empty/error states pass for all built surfaces. App is shippable without MP4.
 **Depends on**: Phase 8
