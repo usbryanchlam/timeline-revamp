@@ -24,18 +24,108 @@ be reproducible from scratch on a fresh VM.
 08-01 lands the api + postgres stack on `127.0.0.1:8787`. 08-02 wires
 Nginx + Let's Encrypt. 08-03 handles DNS cutover + the smoke battery.
 
+## Bootstrap (one-time)
+
+The state bucket is a chicken-and-egg dependency: `terraform init` writes
+state to it, but the bucket itself must exist before the first init.
+Bootstrap it via OCI CLI before running anything Terraform-related.
+
+### 1. Install Terraform, OCI CLI, AWS CLI on the operator laptop
+
+```bash
+brew install hashicorp/tap/terraform@1.10
+brew install oci-cli && oci setup config
+brew install awscli
+brew install actionlint  # optional but recommended (lints .github/workflows/*.yml)
+```
+
+> **Pin TF to 1.10.x, NOT 1.11.x.** TF 1.11.2's S3 backend regression
+> (`x-amz-content-sha256: STREAMING-UNSIGNED-PAYLOAD-TRAILER`) breaks
+> `use_lockfile = true` against OCI's S3-compat endpoint per
+> hashicorp/terraform#36742. Re-test on 1.11.3+ before pinning forward.
+
+### 2. Create the Terraform state bucket on OCI
+
+```bash
+# Namespace lookup (tenant-specific; needed for the S3-compat endpoint URL)
+NAMESPACE=$(oci os ns get --query 'data' --raw-output)
+echo "Namespace: $NAMESPACE"
+
+# Create the state bucket with object-versioning enabled
+oci os bucket create --name timeline-tfstate --compartment-id "$COMPARTMENT_OCID" --versioning Enabled
+
+# Add a 90-day retention rule on deleted objects (D-10 — recover from
+# accidental state delete or rogue apply within 90 days)
+oci os retention-rule create --bucket-name timeline-tfstate --display-name "delete-recovery-90d" --duration '{"timeAmount": 90, "timeUnit": "DAYS"}'
+```
+
+### 3. Generate the Customer Secret Key for backend auth
+
+```bash
+oci iam customer-secret-key create --user-id "$USER_OCID" --display-name "terraform-state-backend"
+# Output: { "data": { "id": "...", "key": "<SECRET — shown ONCE>", "value": "<ACCESS_KEY>" } }
+#
+# Copy the output IMMEDIATELY — the `key` field is shown ONCE:
+#   `value` field → GHA Secret OCI_S3_ACCESS_KEY
+#   `key` field   → GHA Secret OCI_S3_SECRET_KEY
+```
+
+### 4. Configure GitHub Secrets and Variables
+
+Manual GitHub UI step — `Settings → Secrets and variables → Actions`:
+
+| Type | Name | Value |
+|------|------|-------|
+| Secret | `OCI_S3_ACCESS_KEY` | Customer SK `value` field from step 3 |
+| Secret | `OCI_S3_SECRET_KEY` | Customer SK `key` field from step 3 (shown ONCE) |
+| Secret | `SSH_PUBLIC_KEY` | Contents of `~/.ssh/oci-timeline.pub` (the public key the TF compute resource attaches to the VM via `metadata.ssh_authorized_keys`). |
+| Variable | `OCI_DOMAIN_URL` | `https://<domain-id>.identity.oraclecloud.com` (from `oci iam domain list`) |
+| Variable | `OCI_REGION` | e.g., `us-sanjose-1` |
+| Variable | `OCI_TENANCY_OCID` | `ocid1.tenancy.oc1..aaa...` |
+| Variable | `OCI_COMPARTMENT_OCID` | `ocid1.compartment.oc1..aaa...` |
+| Variable | `OCI_NAMESPACE` | Object Storage namespace for your tenancy. Obtain via `oci os ns get`. Used by the S3-compat endpoint URL in `backend.tf` and by the CORS `null_resource` in Plan 02. |
+
+### 5. Configure the GitHub `production` Environment
+
+Manual GitHub UI step — `Settings → Environments → New environment`:
+
+- Name: `production`
+- Required reviewers: add `usbryanchlam`
+- Deployment branches: `main` only
+
+Plan 03's `apply` job is gated by this environment, so the required-reviewers
+gate is what enforces "no untracked apply".
+
+### 6. Generate the SSH key for VM access
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/oci-timeline -C "operator@laptop"
+cat ~/.ssh/oci-timeline.pub  # paste into terraform.tfvars ssh_public_key
+```
+
+### 7. Phase 6 photos bucket disposition (D-13)
+
+Pick ONE before the first `terraform apply` in Plan 02 (which declares
+`oci_objectstorage_bucket.photos`):
+
+- **Option A (recommended for throwaway test data):**
+  ```bash
+  oci os bucket delete --bucket-name timeline-photos --namespace "$NAMESPACE" --empty --force
+  ```
+
+- **Option B (zero data risk — import into TF state):** run AFTER Plan 02's
+  `storage.tf` is on disk.
+  ```bash
+  cd infra/terraform && terraform import oci_objectstorage_bucket.photos "n/$NAMESPACE/b/timeline-photos"
+  ```
+
 ## Prerequisites
 
-- **OCI Ampere A1 VM** (≥ 2 OCPU, ≥ 8 GB RAM) running Ubuntu 22.04 or 24.04
-  LTS. Shape `VM.Standard.A1.Flex`. arm64-native.
-- **OCI Reserved Public IP** attached to the VM's primary VNIC. Required so
-  the public IP survives stop/start cycles (would otherwise rotate, breaking
-  DNS). If your tenancy lacks Reserved Public IP availability, document
-  the dynamic-IP fallback and accept that DNS cutover must be re-run on
-  every VM restart.
+- OCI tenancy with free-tier A1 quota; Customer Secret Key generated per Bootstrap step 3.
 - **OCI VCN Security List** for the VM's subnet opens ingress on `tcp/80`
   and `tcp/443` to `0.0.0.0/0`. Double-layer firewall — `iptables` on the
-  host handles the second layer; `infra/setup.sh` configures it.
+  host handles the second layer; cloud-init configures both (replaces the
+  deleted `infra/setup.sh`).
 - **DNS admin access** for `bryanlam.dev` (TTL lowered 24h ahead of cutover
   so propagation is fast on the day of go-live).
 - **Auth0 tenant admin access** so the production callback URL can be set
@@ -43,35 +133,8 @@ Nginx + Let's Encrypt. 08-03 handles DNS cutover + the smoke battery.
 - **Local `.env.local`** populated with production-ready values for all
   17 keys in `.env.example` (see Environment Variables table below).
 - **OCI PEM** at `~/.oci/timeline-revamp.pem` on your local laptop, ready
-  to scp to the VM.
-
-## Initial VM Setup
-
-Two equivalent invocation paths for `infra/setup.sh`:
-
-**(a) curl-pipe form** — fastest:
-
-```bash
-ssh ubuntu@<vm-public-ip>
-curl -fsSL https://raw.githubusercontent.com/usbryanchlam/timeline-revamp/main/infra/setup.sh | sudo bash
-```
-
-**(b) Manual git clone form** — easier to inspect before running:
-
-```bash
-ssh ubuntu@<vm-public-ip>
-sudo apt-get update && sudo apt-get install -y git
-git clone https://github.com/usbryanchlam/timeline-revamp.git /tmp/timeline-revamp
-sudo bash /tmp/timeline-revamp/infra/setup.sh
-```
-
-Both paths run the same script and produce the same result: Docker +
-Compose plugin + Nginx + certbot installed, `iptables` rules for 80/443
-inserted above the OCI default deny rule, `/opt/timeline-revamp` cloned
-with `ubuntu:ubuntu` ownership, `.oci/` created with `chmod 700`.
-
-After the script completes, **log out and back in** so the `ubuntu` user
-picks up its new `docker` group membership.
+  to scp to the VM (optional once Instance Principal is in place via Plan 02 —
+  SDK auto-detects via the instance metadata endpoint).
 
 ## Environment Variables
 
@@ -155,6 +218,58 @@ container is already serving the Vite SPA at `GET /` (via Hono
 `serveStatic` reading `/app/dist`). Phase 08-02 owns the Nginx + Let's
 Encrypt setup that exposes this to the public internet; Phase 08-03 owns
 DNS cutover and the smoke battery.
+
+## Terraform Provisioning
+
+Replaces the old manual SSH-and-run-setup.sh flow. Run from the operator
+laptop after the Bootstrap section is complete.
+
+```bash
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars
+$EDITOR terraform.tfvars   # fill in real OCIDs, region, ssh_public_key
+
+# Init with backend config (region + namespace are tenant-specific — NOT in backend.tf)
+export AWS_ACCESS_KEY_ID="<OCI_S3_ACCESS_KEY>"
+export AWS_SECRET_ACCESS_KEY="<OCI_S3_SECRET_KEY>"
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required   # Pitfall 9 — OCI S3-compat rejects streaming checksums
+export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+
+terraform init \
+  -backend-config="region=<REGION>" \
+  -backend-config="endpoints={s3=\"https://<NAMESPACE>.compat.objectstorage.<REGION>.oraclecloud.com\"}"
+
+terraform plan -out=tfplan
+terraform apply tfplan
+
+# Hand-off to DNS:
+terraform output public_ip   # paste into your DNS provider's A-record for timeline.bryanlam.dev (Phase 8 Wave 3)
+```
+
+> **OCI Ampere A1 "Out of host capacity":** First `terraform apply` may
+> fail with HTTP 500 `Out of host capacity` on `oci_core_instance.timeline`.
+> OCI's free-tier A1 pool is contested. Mitigations: (a) re-run
+> `terraform apply tfplan` (state is consistent on failure); (b) try a
+> different AD by re-applying with the AD-index variable adjusted (see
+> `main.tf`); (c) try at off-peak hours; (d) reduce shape to 2 OCPU / 12 GB
+> temporarily. **Do NOT add a `null_resource` retry loop in TF** — it
+> pollutes state and the retry shell escapes the declarative model
+> (RESEARCH Pitfall 1).
+
+### Post-Provision: SCP `.env`
+
+Terraform does not manage `.env` secrets (D-08 — TF + secrets-in-state is
+an anti-pattern). After `terraform apply` succeeds, SCP `.env` from the
+laptop to the VM:
+
+```bash
+scp .env ubuntu@$(cd infra/terraform && terraform output -raw public_ip):/opt/timeline-revamp/.env
+ssh ubuntu@$(cd infra/terraform && terraform output -raw public_ip) "chmod 600 /opt/timeline-revamp/.env"
+```
+
+With Instance Principal in place (Plan 02), `.env` no longer needs
+`OCI_PRIVATE_KEY_PATH` / `OCI_USER_OCID` — the OCI SDK auto-detects via
+the instance metadata endpoint.
 
 ## Nginx + Let's Encrypt
 
@@ -438,6 +553,28 @@ docker image prune -f
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml exec postgres \
     pg_dump -U timeline timeline > backup-$(date +%F).sql
+```
+
+### Customer Secret Key Rotation
+
+The state-backend Customer SK is a long-lived credential. Rotate quarterly minimum.
+
+```bash
+# 1. Generate new SK
+oci iam customer-secret-key create \
+  --user-id "$USER_OCID" \
+  --display-name "terraform-state-backend-$(date +%Y%m%d)"
+
+# 2. Update GHA Secrets OCI_S3_ACCESS_KEY + OCI_S3_SECRET_KEY (GitHub UI)
+#    Settings → Secrets and variables → Actions → update both secrets in place.
+
+# 3. Verify the new key works via a no-op `terraform plan` run from CI
+#    (re-run the latest workflow on main).
+
+# 4. Delete the OLD SK ONLY after the no-op plan succeeds:
+oci iam customer-secret-key delete \
+  --user-id "$USER_OCID" \
+  --customer-secret-key-id "<OLD_SK_ID>"
 ```
 
 ## Troubleshooting
