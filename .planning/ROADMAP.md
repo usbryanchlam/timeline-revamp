@@ -187,12 +187,12 @@ Plans:
 **Goal:** Replace manual Phase 8 OCI provisioning with Terraform-managed IaC. Full OCI footprint (VCN + Ampere A1 4/24/100 VM + Reserved Public IP + photos bucket + IAM Instance Principal) declared in `infra/terraform/`; cloud-init absorbs `infra/setup.sh` line-by-line; GHA OIDC workflow handles plan-on-PR, apply-on-main with manual approval, and weekly drift detection. Pre-cuts the Phase 8 Wave 3 DNS flip so it targets a TF-provisioned VM.
 **Requirements**: DEPLOY-01 (re-scoped from Phase 8 manual to 8.1 TF), DEPLOY-03 (partial — TF-infrastructure CI; app-code CI remains Phase 9), DEPLOY-07 (NEW candidate — infrastructure reproducible via `terraform apply`; no clickops)
 **Depends on:** Phase 8 (paused at Wave 3 DNS cutover; 8.1 lands fully before Wave 3 resumes)
-**Plans:** 3 plans (planned 2026-05-18)
+**Plans:** 1/3 plans executed
 
 Plans:
 
 **Wave 1**
-- [ ] 08.1-01-PLAN.md — TF stack scaffolding (versions/providers/backend/variables/main/network/compute/cloud-init) + reserved public IP + cloud-init.yaml absorbing setup.sh + DEPLOY.md Bootstrap + Terraform Provisioning sections + delete infra/setup.sh [DEPLOY-01, DEPLOY-07]
+- [x] 08.1-01-PLAN.md — TF stack scaffolding (versions/providers/backend/variables/main/network/compute/cloud-init) + reserved public IP + cloud-init.yaml absorbing setup.sh + DEPLOY.md Bootstrap + Terraform Provisioning sections + delete infra/setup.sh [DEPLOY-01, DEPLOY-07]
 
 **Wave 2** *(depends on 08.1-01 for the instance OCID consumed by dynamic group matching_rule)*
 - [ ] 08.1-02-PLAN.md — storage.tf (photos bucket + CORS via null_resource/aws s3api S3-compat — provider has NO native cors_rules) + iam.tf (dynamic group scoped to instance.id; policy scoped to target.bucket.name='timeline-photos') + outputs.tf bucket_name + namespace [DEPLOY-01, DEPLOY-07]
