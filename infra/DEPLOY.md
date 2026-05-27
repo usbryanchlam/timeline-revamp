@@ -103,6 +103,38 @@ ssh-keygen -t ed25519 -f ~/.ssh/oci-timeline -C "operator@laptop"
 cat ~/.ssh/oci-timeline.pub  # paste into terraform.tfvars ssh_public_key
 ```
 
+### 6a. Extract Phase 6 CORS rules (if importing — Option B below)
+
+Only run this sub-step if you intend to choose Option B (`terraform import`)
+in Section 7 below. Extracts the live Phase 6 bucket's CORS rules so
+`terraform.tfvars` has the production-correct values BEFORE the first
+`null_resource.photos_cors` re-applies them (otherwise the default in
+`variables.tf` may overwrite production CORS).
+
+If you intend Option A (delete-and-recreate), skip to Section 7 — the
+`variables.tf` default rules apply on the fresh bucket.
+
+```bash
+export AWS_ACCESS_KEY_ID="$OCI_S3_ACCESS_KEY"
+export AWS_SECRET_ACCESS_KEY="$OCI_S3_SECRET_KEY"
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+
+aws s3api get-bucket-cors \
+  --endpoint-url "https://$NAMESPACE.compat.objectstorage.$REGION.oraclecloud.com" \
+  --bucket timeline-photos \
+  | jq '.CORSRules' \
+  > /tmp/phase6-cors.json
+```
+
+If `/tmp/phase6-cors.json` is non-empty, paste its array contents into the
+`photos_cors_rules = [...]` block of `terraform.tfvars` (NOT `.example`),
+translating jq's JSON keys to HCL (quoted → bare, e.g., `"AllowedOrigins"` →
+`AllowedOrigins`). If empty (no CORS set on the Phase 6 bucket — confirmed
+during 08.1 bootstrap that the Phase 6 attempt silently dropped rules per
+project memory `feedback_oci_cors_via_s3.md`), the `variables.tf` default
+applies.
+
 ### 7. Phase 6 photos bucket disposition (D-13)
 
 Pick ONE before the first `terraform apply` in Plan 02 (which declares
@@ -113,7 +145,8 @@ Pick ONE before the first `terraform apply` in Plan 02 (which declares
   oci os bucket delete --bucket-name timeline-photos --namespace "$NAMESPACE" --empty --force
   ```
 
-- **Option B (zero data risk — import into TF state):** run AFTER Plan 02's
+- **Option B (zero data risk — import into TF state):** run Section 6a FIRST
+  to capture the live Phase 6 CORS rules, THEN run the import AFTER Plan 02's
   `storage.tf` is on disk.
   ```bash
   cd infra/terraform && terraform import oci_objectstorage_bucket.photos "n/$NAMESPACE/b/timeline-photos"
