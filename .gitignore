@@ -55,3 +55,14 @@ progress*.md
 
 # Local dev TLS certs from mkcert (machine + LAN-specific; never commit)
 .dev/certs/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+!.terraform.lock.hcl
+tfplan
+crash.log
+crash.*.log
