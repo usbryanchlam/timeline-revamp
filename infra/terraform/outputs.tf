@@ -8,4 +8,12 @@ output "instance_ocid" {
   value       = oci_core_instance.timeline.id
 }
 
-# NOTE: bucket_name + namespace outputs are added by Plan 02 (storage.tf).
+output "bucket_name" {
+  description = "Photos bucket name (for app .env OCI_BUCKET_NAME)"
+  value       = oci_objectstorage_bucket.photos.name
+}
+
+output "namespace" {
+  description = "OCI Object Storage namespace (for app .env OCI_NAMESPACE)"
+  value       = data.oci_objectstorage_namespace.this.namespace
+}
