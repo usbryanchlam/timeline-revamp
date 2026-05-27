@@ -4,8 +4,8 @@ milestone: v1.0.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 08.1 context gathered
-last_updated: "2026-05-18T05:14:51.753Z"
-last_activity: 2026-05-18 -- Phase 08.1 planning complete
+last_updated: "2026-05-27T05:01:15.633Z"
+last_activity: 2026-05-27 -- Phase 08.1 execution started
 progress:
   total_phases: 13
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 08 — deploy-part-1
+**Current focus:** Phase 08.1 — infra-terraform
 
 ## Current Position
 
-Phase: 08 (deploy-part-1) — EXECUTING
+Phase: 08.1 (infra-terraform) — EXECUTING
 Plan: 1 of 3
-Status: Ready to execute
-Last activity: 2026-05-18 -- Phase 08.1 planning complete
+Status: Executing Phase 08.1
+Last activity: 2026-05-27 -- Phase 08.1 execution started
 
 Progress: [███████░░░░░] 58% (7 of 12 phases complete)
 

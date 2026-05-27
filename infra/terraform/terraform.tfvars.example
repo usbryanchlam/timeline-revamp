@@ -1,0 +1,23 @@
+# Copy to terraform.tfvars and populate. NEVER commit terraform.tfvars (.gitignore enforces).
+#
+# Pitfall 7 reminder:
+#   tenancy_ocid     starts with `ocid1.tenancy.oc1..`
+#   compartment_ocid starts with `ocid1.compartment.oc1..`
+# These are NOT interchangeable. Pasting tenancy where compartment is expected (or
+# vice versa) causes confusing IAM policy failures.
+
+tenancy_ocid     = "ocid1.tenancy.oc1..aaaaaaaaXXXXXXXXXXXXXXXXXX"
+compartment_ocid = "ocid1.compartment.oc1..aaaaaaaaXXXXXXXXXXXXXXXXXX"
+region           = "us-sanjose-1"
+ssh_public_key   = "ssh-ed25519 AAAA... operator@laptop"
+repo_url         = "https://github.com/usbryanchlam/timeline-revamp.git"
+
+# Optional override — defaults are baked into variables.tf. Uncomment only if the
+# bucket needs different origins/methods than the default Phase 6 + localhost set.
+# photos_cors_rules = [{
+#   AllowedOrigins = ["https://timeline.bryanlam.dev", "http://localhost:5173", "https://localhost:5173"]
+#   AllowedMethods = ["GET", "HEAD", "PUT"]
+#   AllowedHeaders = ["*"]
+#   ExposeHeaders  = ["ETag", "Content-Length", "x-amz-version-id"]
+#   MaxAgeSeconds  = 3600
+# }]

@@ -1,0 +1,56 @@
+#cloud-config
+# Managed by Terraform — edit infra/cloud-init.yaml, not the rendered file.
+# Cloud-init module execution order: write_files → set_timezone → groups → users →
+# packages (package_update, package_upgrade, packages) → runcmd. So iptables-persistent
+# is installed BEFORE the runcmd block fires. [VERIFIED: cloud-init docs reference]
+
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose-plugin
+  - nginx
+  - certbot
+  - python3-certbot-nginx
+  - iptables-persistent
+  - git
+
+timezone: UTC
+
+groups:
+  - docker
+
+users:
+  - default
+  - name: ubuntu
+    groups: [docker]
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+
+write_files:
+  - path: /opt/timeline-revamp/.env.example.placeholder
+    content: |
+      # See infra/DEPLOY.md § "Step 3: Provision secrets"
+      # SCP the real .env from the operator's laptop after `terraform apply`.
+    owner: ubuntu:ubuntu
+    permissions: '0644'
+
+runcmd:
+  # iptables ACCEPT-before-REJECT — replicates infra/setup.sh:41-43 verbatim.
+  # Insert at position 6 so the rules sit ABOVE the OCI Ubuntu base image's
+  # default deny-all rule. The position number mirrors the mykb pattern;
+  # verify on the VM with: sudo iptables -L INPUT -n --line-numbers
+  - iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  - iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+  - netfilter-persistent save
+  # App directory + ownership
+  - mkdir -p /opt/timeline-revamp
+  - chown -R ubuntu:ubuntu /opt/timeline-revamp
+  # Clone repo as ubuntu user (|| true keeps cloud-init idempotent even though it only runs once)
+  - sudo -u ubuntu git clone ${repo_url} /opt/timeline-revamp || true
+  # OCI credentials dir (Instance Principal — no PEM needed)
+  - mkdir -p /opt/timeline-revamp/.oci
+  - chmod 700 /opt/timeline-revamp/.oci
+  - chown ubuntu:ubuntu /opt/timeline-revamp/.oci
+
+final_message: "Cloud-init complete. SSH in, SCP .env, run docker compose up -d --build. See infra/DEPLOY.md."
