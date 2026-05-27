@@ -47,6 +47,16 @@ brew install actionlint  # optional but recommended (lints .github/workflows/*.y
 ### 2. Create the Terraform state bucket on OCI
 
 ```bash
+# Verify the Default Identity Domain exists (REQUIRED for Plan 03's OIDC trust;
+# Pitfall 6 — legacy OCI tenancies pre-2023 may not have one provisioned).
+# Modern tenancies (2023+) have a Default domain automatically.
+oci iam domain list \
+  --compartment-id "$OCI_TENANCY_OCID" \
+  --query 'data[?"display-name" == `Default`]'
+# If the returned array is empty, create a Default domain via the OCI Console:
+#   Identity & Security → Domains → Create domain → Free license type.
+# Plan 03's data.oci_identity_domains.default lookup will 404 otherwise.
+
 # Namespace lookup (tenant-specific; needed for the S3-compat endpoint URL)
 NAMESPACE=$(oci os ns get --query 'data' --raw-output)
 echo "Namespace: $NAMESPACE"
@@ -84,6 +94,15 @@ Manual GitHub UI step — `Settings → Secrets and variables → Actions`:
 | Variable | `OCI_TENANCY_OCID` | `ocid1.tenancy.oc1..aaa...` |
 | Variable | `OCI_COMPARTMENT_OCID` | `ocid1.compartment.oc1..aaa...` |
 | Variable | `OCI_NAMESPACE` | Object Storage namespace for your tenancy. Obtain via `oci os ns get`. Used by the S3-compat endpoint URL in `backend.tf` and by the CORS `null_resource` in Plan 02. |
+
+> **Fork PRs (Pitfall 10):** GitHub does not issue OIDC tokens to PRs from
+> forks by default. Workflow runs originated from forks will fail at the
+> `Authenticate to OCI via OIDC token exchange` step (no
+> `ACTIONS_ID_TOKEN_REQUEST_TOKEN` issued). This is acceptable for a solo
+> project. For future contributors, the workflow falls back to
+> `terraform fmt -check` + `terraform validate` only (no plan diff against the
+> live tenancy); maintainer approval via `Settings → Actions → General →
+> Fork pull request workflows` is required to run full plans against forks.
 
 ### 5. Configure the GitHub `production` Environment
 

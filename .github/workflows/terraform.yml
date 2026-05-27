@@ -1,0 +1,201 @@
+# Terraform CI/CD for OCI infrastructure.
+#
+# Three triggers, two jobs:
+#   pull_request   -> plan job (posts terraform plan as PR comment, read-only OIDC identity)
+#   push: main     -> plan + apply jobs (apply gated by `environment: production` reviewer)
+#   schedule cron  -> plan job (drift detection, opens/updates a GitHub Issue if drift found)
+#
+# OIDC token exchange exchanges a GitHub-issued JWT for an OCI UPST via the
+# Identity Domain's /oauth2/v1/token endpoint. The trust resource and the two
+# Service Users live in infra/terraform/iam.tf (Plan 03). Subject-claim rules:
+#   refs/heads/main  -> gha_deployer (manage all-resources)
+#   pull_request     -> gha_pr_reader (inspect + read object-family only)
+#
+# Pitfall 9: AWS_REQUEST_CHECKSUM_CALCULATION / AWS_RESPONSE_CHECKSUM_VALIDATION
+# MUST be `when_required` — AWS CLI/SDK v2.23+ default to streaming SHA-256 which
+# the OCI S3-compat endpoint rejects on the state backend.
+name: terraform
+
+on:
+  pull_request:
+    paths:
+      - 'infra/terraform/**'
+      - 'infra/cloud-init.yaml'
+      - '.github/workflows/terraform.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - 'infra/cloud-init.yaml'
+      - '.github/workflows/terraform.yml'
+  schedule:
+    - cron: '0 12 * * 1'   # Monday noon UTC (D-18 drift detection)
+
+permissions:
+  contents: read
+  id-token: write          # REQUIRED for OIDC token issuance (D-04)
+  issues: write            # for drift Issue creation
+  pull-requests: write     # for plan PR comments
+
+env:
+  TF_VERSION: '1.10.7'
+  AWS_ACCESS_KEY_ID: ${{ secrets.OCI_S3_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.OCI_S3_SECRET_KEY }}
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+  # TF_VAR_* env vars satisfy variables.tf's required-without-default declarations.
+  # Workflow-level env applies to ALL steps in both plan + apply jobs.
+  TF_VAR_tenancy_ocid: ${{ vars.OCI_TENANCY_OCID }}
+  TF_VAR_compartment_ocid: ${{ vars.OCI_COMPARTMENT_OCID }}
+  TF_VAR_region: ${{ vars.OCI_REGION }}
+  TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to OCI via OIDC token exchange
+        run: |
+          set -euo pipefail
+          GH_OIDC=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+                    "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://oraclecloud.com" \
+                    | jq -r '.value')
+          UPST=$(curl -sX POST "${{ vars.OCI_DOMAIN_URL }}/oauth2/v1/token" \
+                  -H 'Content-Type: application/x-www-form-urlencoded' \
+                  --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+                  --data-urlencode "requested_token_type=urn:oci:token-type:upst" \
+                  --data-urlencode "subject_token=$GH_OIDC" \
+                  --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
+                  | jq -r '.access_token')
+          mkdir -p ~/.oci
+          echo "$UPST" > ~/.oci/upst.token
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          region=${{ vars.OCI_REGION }}
+          tenancy=${{ vars.OCI_TENANCY_OCID }}
+          security_token_file=~/.oci/upst.token
+          EOF
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform format check
+        working-directory: infra/terraform
+        run: terraform fmt -check
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: |
+          terraform init -input=false \
+            -backend-config="region=${{ vars.OCI_REGION }}" \
+            -backend-config="endpoints={s3=\"https://${{ vars.OCI_NAMESPACE }}.compat.objectstorage.${{ vars.OCI_REGION }}.oraclecloud.com\"}"
+
+      - name: Terraform validate
+        working-directory: infra/terraform
+        run: terraform validate
+
+      - name: Terraform plan
+        id: plan
+        working-directory: infra/terraform
+        run: terraform plan -no-color -out=tfplan -detailed-exitcode
+        continue-on-error: true   # exitcode 2 = changes; surface it, don't fail the job
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `### Terraform plan\n\n\`\`\`\n${{ steps.plan.outputs.stdout }}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner, repo: context.repo.repo,
+              body: output,
+            })
+
+      - name: Save plan artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform/tfplan
+
+      - name: Open or append drift issue
+        if: github.event_name == 'schedule' && steps.plan.outputs.exitcode == '2'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '[drift] Terraform plan detected unexpected changes';
+            const body = `\`\`\`\n${{ steps.plan.outputs.stdout }}\n\`\`\``;
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              labels: 'drift,infrastructure', state: 'open'
+            });
+            const match = existing.data.find(i => i.title === title);
+            if (match) {
+              await github.rest.issues.createComment({
+                issue_number: match.number,
+                owner: context.repo.owner, repo: context.repo.repo,
+                body: `New drift detection at ${new Date().toISOString()}:\n${body}`
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: ['drift', 'infrastructure']
+              });
+            }
+
+  apply:
+    needs: plan
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production           # D-17 manual reviewer gate (required reviewer = usbryanchlam)
+    concurrency:
+      group: terraform-apply
+      cancel-in-progress: false       # queued applies WAIT — never cancel mid-flight
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to OCI via OIDC token exchange
+        run: |
+          set -euo pipefail
+          GH_OIDC=$(curl -sH "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+                    "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://oraclecloud.com" \
+                    | jq -r '.value')
+          UPST=$(curl -sX POST "${{ vars.OCI_DOMAIN_URL }}/oauth2/v1/token" \
+                  -H 'Content-Type: application/x-www-form-urlencoded' \
+                  --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+                  --data-urlencode "requested_token_type=urn:oci:token-type:upst" \
+                  --data-urlencode "subject_token=$GH_OIDC" \
+                  --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
+                  | jq -r '.access_token')
+          mkdir -p ~/.oci
+          echo "$UPST" > ~/.oci/upst.token
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          region=${{ vars.OCI_REGION }}
+          tenancy=${{ vars.OCI_TENANCY_OCID }}
+          security_token_file=~/.oci/upst.token
+          EOF
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform/
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: |
+          terraform init -input=false \
+            -backend-config="region=${{ vars.OCI_REGION }}" \
+            -backend-config="endpoints={s3=\"https://${{ vars.OCI_NAMESPACE }}.compat.objectstorage.${{ vars.OCI_REGION }}.oraclecloud.com\"}"
+
+      - name: Terraform apply
+        working-directory: infra/terraform
+        run: terraform apply -input=false -no-color tfplan
