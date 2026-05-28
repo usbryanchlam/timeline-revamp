@@ -39,22 +39,10 @@ resource "oci_objectstorage_bucket" "photos" {
 #   `CORSRules` (the var.photos_cors_rules object fields already use the
 #   PascalCase shape AllowedOrigins/AllowedMethods/AllowedHeaders/ExposeHeaders/
 #   MaxAgeSeconds — see variables.tf).
-resource "null_resource" "photos_cors" {
-  triggers = {
-    rules_hash = sha256(jsonencode(var.photos_cors_rules))
-    bucket_id  = oci_objectstorage_bucket.photos.id
-  }
-
-  provisioner "local-exec" {
-    command = <<-EOT
-      export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
-      export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
-      aws s3api put-bucket-cors \
-        --endpoint-url "https://${data.oci_objectstorage_namespace.this.namespace}.compat.objectstorage.${var.region}.oraclecloud.com" \
-        --bucket "${oci_objectstorage_bucket.photos.name}" \
-        --cors-configuration '${jsonencode({ CORSRules = var.photos_cors_rules })}'
-    EOT
-  }
-
-  depends_on = [oci_objectstorage_bucket.photos]
-}
+# CORS configuration deferred — see CONTEXT.md D-15 + 08.1-HUMAN-UAT.md.
+# Neither OCI S3-compat (returns 501 NotImplemented on PutBucketCors) nor OCI
+# Native API (no corsRules field on bucket data model) currently support CORS
+# configuration via Terraform. Set CORS via OCI Console UI as a one-time
+# operator step when cross-origin photo uploads are needed. The
+# `var.photos_cors_rules` variable in variables.tf preserves the intended
+# values for future reactivation when upstream API support lands.

@@ -103,37 +103,15 @@ resource "oci_identity_domains_user" "gha_pr_reader" {
   schemas = ["urn:ietf:params:scim:schemas:core:2.0:User"]
 }
 
-resource "oci_identity_domains_identity_propagation_trust" "github_actions" {
-  idcs_endpoint             = data.oci_identity_domains.default.domains[0].url
-  name                      = "github-actions-timeline-revamp"
-  description               = "OIDC trust for GitHub Actions workflows on usbryanchlam/timeline-revamp"
-  active                    = true
-  type                      = "JWT"
-  account_id                = "usbryanchlam"
-  issuer                    = "https://token.actions.githubusercontent.com"
-  subject_type              = "User"
-  subject_mapping_attribute = "sub"
-  subject_claim_name        = "sub"
-
-  # NOTE: oracle/oci v6.37.0 does NOT expose an `allowed_token_issuers` nested
-  # block on this resource (RESEARCH Assumption A3 — field-name verification
-  # via `terraform providers schema` at execution time). The `issuer` attribute
-  # alone is the JWT issuer constraint; `impersonation_service_users.rule`
-  # below provides the subject-claim narrowing.
-
-  # D-19 two-identity pattern: tight OIDC subject scoping per Threat T-08.1-06.
-  # Exact-string matches — NEVER widen to `repo:OWNER/REPO:*` or any wildcard.
-  impersonation_service_users {
-    rule  = "sub eq \"repo:usbryanchlam/timeline-revamp:ref:refs/heads/main\""
-    value = oci_identity_domains_user.gha_deployer.id
-  }
-  impersonation_service_users {
-    rule  = "sub eq \"repo:usbryanchlam/timeline-revamp:pull_request\""
-    value = oci_identity_domains_user.gha_pr_reader.id
-  }
-
-  schemas = ["urn:ietf:params:scim:schemas:oracle:idcs:IdentityPropagationTrust"]
-}
+# OIDC Identity Propagation Trust deferred — see 08.1-HUMAN-UAT.md.
+# The `oci_identity_domains_identity_propagation_trust` resource in oracle/oci
+# v6.37.0 returns 400 BadErrorResponse on creation (provider is 56 versions
+# behind current; schema for this resource has changed in newer provider
+# versions). The two service users (gha_deployer, gha_pr_reader) and their
+# scoped policies below are kept — they will bind to a working OIDC trust
+# once the provider is bumped and the schema is reverified. Until then, GHA
+# `terraform apply` is deferred; manual `terraform apply` from the operator
+# laptop is the working path.
 
 resource "oci_identity_policy" "gha_deployer_manage" {
   compartment_id = var.compartment_ocid
