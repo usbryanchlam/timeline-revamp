@@ -473,13 +473,7 @@ Pre-flight requirement: 08-02's `curl --resolve` smoke MUST return HTTP/2 200 BE
    - Allowed Web Origins: add `https://timeline.bryanlam.dev`
    - Save changes.
 
-7. **Verify OCI Object Storage CORS** (per memory `feedback_oci_cors_via_s3.md` -- OCI Console UI has no CORS tab; the Native API silently drops `corsRules`):
-   ```bash
-   aws s3api get-bucket-cors \
-     --bucket timeline-photos \
-     --endpoint-url https://<namespace>.compat.objectstorage.<region>.oraclecloud.com
-   ```
-   `AllowedOrigins` MUST include `https://timeline.bryanlam.dev`. If missing, re-apply via the S3-compat `put-bucket-cors` operation -- NOT the OCI Console UI, NOT the Native API (both silently drop the rules).
+7. **OCI Object Storage CORS — not applicable for this stack.** Skip any CORS verification at cutover. Modern OCI Object Storage exposes no bucket-level CORS at any layer (no Console UI control, no Native API field, S3-compat returns `NotImplemented`). This stack does not need it: browser uploads go through PARs (which carry their own `Access-Control-Allow-Origin` header automatically), and photo display uses bare `<img src=...>` tags without `crossOrigin` (which browsers do not subject to CORS enforcement). If a future feature adds canvas pixel reads or credentialed `fetch()` against bucket URLs, the workaround is to front the bucket with an OCI API Gateway. See memory `feedback_oci_cors_via_s3.md` for the full evidence trail.
 
 ## Smoke Test
 
