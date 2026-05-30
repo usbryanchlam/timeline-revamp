@@ -12,9 +12,12 @@ out/
 
 # Env
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+
+# OCI API key material (PEM files; never commit)
+.oci/
+*.pem
 
 # Postgres data (if ever bind-mounted; named volume `pgdata` is Docker-managed)
 pgdata/
