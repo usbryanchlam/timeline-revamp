@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { useApi } from '@/auth/useApi';
 import { HandlePickerModal } from '@/auth/HandlePickerModal';
+import { suggestHandle } from '@/auth/suggestHandle';
 
 interface MeResponse {
   id: string;
@@ -26,8 +28,19 @@ interface MeResponse {
 // has a handle.
 export function HandlePickerGate({ children }: { children: ReactNode }) {
   const api = useApi();
+  const { user } = useAuth0();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
+
+  // Derived once at render. The Auth0 user object is stable across renders
+  // for an authenticated session, so re-computing on every render is cheap.
+  // Reads three standard claims; absent claims become empty strings and
+  // the next candidate is tried.
+  const suggestedHandle = suggestHandle({
+    nickname: user?.nickname,
+    email: user?.email,
+    given_name: user?.given_name,
+  });
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -49,7 +62,10 @@ export function HandlePickerGate({ children }: { children: ReactNode }) {
     <>
       {children}
       {loaded && me && me.handle === null && (
-        <HandlePickerModal onPicked={(handle) => setMe({ ...me, handle })} />
+        <HandlePickerModal
+          suggestedHandle={suggestedHandle}
+          onPicked={(handle) => setMe({ ...me, handle })}
+        />
       )}
     </>
   );

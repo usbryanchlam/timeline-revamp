@@ -32,9 +32,20 @@ function errorFor(reason: ValidationReason): string {
   }
 }
 
-export function HandlePickerModal({ onPicked }: { onPicked: (handle: string) => void }) {
+interface HandlePickerModalProps {
+  readonly onPicked: (handle: string) => void;
+  // Optional pre-filled handle suggestion derived from Auth0 user identity
+  // (see HandlePickerGate → suggestHandle). When provided AND valid, the
+  // modal opens with the input populated and the live availability check
+  // fires automatically — the Claim button is enabled on first paint if
+  // the suggestion isn't already taken. Falls back to empty string when
+  // no usable suggestion can be derived (returns to the prior behavior).
+  readonly suggestedHandle?: string;
+}
+
+export function HandlePickerModal({ onPicked, suggestedHandle = '' }: HandlePickerModalProps) {
   const api = useApi();
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(suggestedHandle);
   const [status, setStatus] = useState<Status>('idle');
   const dialogRef = useRef<HTMLDialogElement | null>(null);
 
