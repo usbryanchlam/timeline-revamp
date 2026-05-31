@@ -15,8 +15,21 @@ resource "oci_objectstorage_bucket" "photos" {
   compartment_id = var.compartment_ocid
   namespace      = data.oci_objectstorage_namespace.this.namespace
   name           = "timeline-photos"
-  access_type    = "NoPublicAccess" # PARs minted per-object; no public list access
-  versioning     = "Enabled"
+  # ObjectRead allows anonymous GET on objects (by their UUID name) but
+  # disallows bucket listing. Required by the v1 photo pipeline:
+  #   - server/oci/parClient.ts:getMasterBuffer does unauthenticated fetch
+  #     against the bucket's public URL to read the just-uploaded master
+  #     for thumbnail generation
+  #   - src/components/PhotoGrid.tsx + PhotoViewer.tsx render <img
+  #     src={thumbUrl/masterUrl}> with the public URL pattern; no
+  #     crossOrigin attribute so browsers do not enforce CORS
+  # Security model: UUID-named objects are unguessable (128 bits); no
+  # listing means an attacker cannot enumerate the photo set. Equivalent
+  # to Google Photos shared-album-by-link semantics. Path B (mint short
+  # TTL read PARs server-side, pass PAR URLs to the client) is a
+  # follow-up hardening — see 08.1-HUMAN-UAT.md.
+  access_type = "ObjectRead"
+  versioning  = "Enabled"
 
   freeform_tags = {
     "managed-by"  = "terraform"
