@@ -58,7 +58,12 @@ export const TAP_MAX_TRAVEL_PX = 10 as const;
 export const LONG_PRESS_MS = 200 as const;
 export const MAP_INTERACT_IDLE_MS = 3000 as const;
 export const ORIENTATION_SETTLE_MS = 300 as const;
-export const FLY_DURATION_MS = 1800 as const;
+// Re-export the canonical camera flight duration. The single source of
+// truth lives in src/reel/motion.ts so the gesture state machine's
+// CHAPTER_FLY_DONE timer stays in lockstep with MapCanvas's actual flyTo
+// duration. Update there; this re-export keeps the existing import shape
+// at gestures/useGestureMachine.ts working unchanged.
+export { FLY_DURATION_MS } from '@/reel/motion';
 
 export function initialState(chapterCount: number): ReelState {
   return {

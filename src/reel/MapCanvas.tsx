@@ -2,18 +2,7 @@ import { useEffect, useRef } from 'react';
 import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl';
 import type { CityChapter, ReelStateName } from '@/types/reel';
 import { STYLE_URL } from '@/reel/mapStyle';
-
-// Apple-Maps-Flyover-ish curve for camera flights. MapLibre's flyTo accepts a
-// numeric `curve` (zoom-out arc) and a custom `easing` function.
-const ARRIVAL_CURVE = 1.6;
-const FLY_DURATION_MS = 1800;
-
-// cubic-bezier(0.16, 1, 0.3, 1) approximation for MapLibre's easing(t) -> t.
-// MapLibre passes a 0..1 parameter and expects a 0..1 output.
-function easeArrival(t: number): number {
-  // Inlined cubic-bezier(0.16, 1, 0.3, 1) — Penner-style "expo-out with overshoot".
-  return 1 - Math.pow(1 - t, 3.2);
-}
+import { FLY_DURATION_MS, FLY_CURVE, easeCamera } from '@/reel/motion';
 
 interface Props {
   readonly chapters: readonly CityChapter[];
@@ -93,8 +82,8 @@ export function MapCanvas({ chapters, chapterIndex, stateName, onUserMapInteract
       pitch: target.pitch,
       bearing: target.bearing,
       duration: FLY_DURATION_MS,
-      curve: ARRIVAL_CURVE,
-      easing: easeArrival,
+      curve: FLY_CURVE,
+      easing: easeCamera,
       essential: true,
     });
   }, [chapterIndex, chapters]);
