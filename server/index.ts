@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
-import { serveStatic } from 'hono/bun';
 import { serve } from '@hono/node-server';
 import { env } from './env.js';
 import { requireJwt } from './auth/jwt.js';
@@ -80,14 +79,21 @@ app.route('/api/cities/:cityId/photos', photosNestedRouter);
 // above MUST register before this catch-all. Hono evaluates middleware
 // in registration order — an earlier '/*' mount would swallow /api/*.
 //
-// In development the Vite dev server owns the SPA and there is no dist/
-// directory; the missing-root case yields a 404 from serveStatic, which
-// is harmless because the dev workflow hits :5173 (Vite) not :8787 (API).
-app.use('/*', serveStatic({ root: './dist' }));
-// SPA fallback: any path that does not map to a real file in dist/
-// returns index.html so client-side routes like /u/<handle> and /app/*
-// render the React shell.
-app.get('*', serveStatic({ path: './dist/index.html' }));
+// Runtime gating: `hono/bun`'s `serveStatic` references the `Bun` global
+// at module-eval time and crashes on Node import. The dev orchestrator
+// (`scripts/dev.ts`) runs the server under tsx-on-Node so we MUST avoid
+// the import in dev. Production runs under Bun in the runtime Docker
+// stage where dist/ exists, the Bun global is defined, and the SPA
+// fallback is needed. Dynamic import gated on runtime detection threads
+// both paths cleanly.
+if (typeof (globalThis as Record<string, unknown>).Bun !== 'undefined') {
+  const { serveStatic } = await import('hono/bun');
+  app.use('/*', serveStatic({ root: './dist' }));
+  // SPA fallback: any path that does not map to a real file in dist/
+  // returns index.html so client-side routes like /u/<handle> and /app/*
+  // render the React shell.
+  app.get('*', serveStatic({ path: './dist/index.html' }));
+}
 
 serve(
   { fetch: app.fetch, port: env.PORT },
