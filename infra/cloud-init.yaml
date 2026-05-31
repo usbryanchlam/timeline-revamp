@@ -1,19 +1,33 @@
 #cloud-config
 # Managed by Terraform — edit infra/cloud-init.yaml, not the rendered file.
 # Cloud-init module execution order: write_files → set_timezone → groups → users →
-# packages (package_update, package_upgrade, packages) → runcmd. So iptables-persistent
-# is installed BEFORE the runcmd block fires. [VERIFIED: cloud-init docs reference]
+# packages (package_update, package_upgrade, packages) → runcmd.
+#
+# Phase 8.1.1 (2026-05-30): five bugs from Phase 8 Wave 3 SSH UAT fixed.
+# See .planning/phases/08-deploy-part-1/.continue-here.md F1 for the trail.
+#   1. docker-compose-plugin removed from packages: (not in jammy default repos);
+#      Docker's official apt repo added + the plugin installed in runcmd.
+#   2. iptables ACCEPT 80/443 dynamically inserted above the REJECT line,
+#      not at a hardcoded position (chain layout drifts across OCI base
+#      images).
+#   3. .env.example.placeholder write_files entry removed — it dropped a
+#      file into /opt/timeline-revamp before git clone ran, causing clone
+#      into non-empty dir to fail silently under `|| true`.
+#   4. /var/cache/nginx/public_reel pre-created so `nginx -t` doesn't fail
+#      after the operator symlinks ops/nginx/timeline.conf in Phase 8 Wave 2.
+#   5. (Out of scope here — operator scp's PEM as UID 1001 per DEPLOY.md.)
 
 package_update: true
 package_upgrade: true
 packages:
   - docker.io
-  - docker-compose-plugin
   - nginx
   - certbot
   - python3-certbot-nginx
   - iptables-persistent
   - git
+  - ca-certificates
+  - curl
 
 timezone: UTC
 
@@ -27,30 +41,50 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
 
-write_files:
-  - path: /opt/timeline-revamp/.env.example.placeholder
-    content: |
-      # See infra/DEPLOY.md § "Step 3: Provision secrets"
-      # SCP the real .env from the operator's laptop after `terraform apply`.
-    owner: ubuntu:ubuntu
-    permissions: '0644'
-
 runcmd:
-  # iptables ACCEPT-before-REJECT — replicates infra/setup.sh:41-43 verbatim.
-  # Insert at position 6 so the rules sit ABOVE the OCI Ubuntu base image's
-  # default deny-all rule. The position number mirrors the mykb pattern;
-  # verify on the VM with: sudo iptables -L INPUT -n --line-numbers
-  - iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-  - iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-  - netfilter-persistent save
-  # App directory + ownership
-  - mkdir -p /opt/timeline-revamp
-  - chown -R ubuntu:ubuntu /opt/timeline-revamp
-  # Clone repo as ubuntu user (|| true keeps cloud-init idempotent even though it only runs once)
-  - sudo -u ubuntu git clone ${repo_url} /opt/timeline-revamp || true
-  # OCI credentials dir (Instance Principal — no PEM needed)
-  - mkdir -p /opt/timeline-revamp/.oci
-  - chmod 700 /opt/timeline-revamp/.oci
-  - chown ubuntu:ubuntu /opt/timeline-revamp/.oci
+  # --- Docker Compose v2 plugin -----------------------------------------------
+  # docker-compose-plugin is not in Ubuntu 22.04 jammy default repos. Phase 8
+  # Wave 3 surfaced this — cloud-init's `packages:` errored on the unknown pkg
+  # and the rest of the script ran anyway. Install from Docker's official apt
+  # repo here, after ca-certificates + curl from `packages:` have landed.
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - |
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-compose-plugin
 
-final_message: "Cloud-init complete. SSH in, SCP .env, run docker compose up -d --build. See infra/DEPLOY.md."
+  # --- iptables ACCEPT 80/443 above any REJECT -------------------------------
+  # OCI Ubuntu 22.04 ARM images ship a default chain whose layout has varied
+  # across releases (the REJECT line is typically at position 5, but pinning
+  # a hardcoded `-I INPUT 6` lands rules AFTER the REJECT — exactly the bug
+  # Phase 8 Wave 3 hit). Find the first REJECT line dynamically and insert
+  # ACCEPTs above it. Falls back to position 1 (top of chain) if no REJECT
+  # is present, which is defensively-correct even on a fresh chain.
+  - |
+    REJECT_POS=$(iptables -L INPUT -n --line-numbers | awk '/REJECT/ {print $1; exit}')
+    REJECT_POS=$${REJECT_POS:-1}
+    iptables -I INPUT "$REJECT_POS" -m state --state NEW -p tcp --dport 443 -j ACCEPT
+    iptables -I INPUT "$REJECT_POS" -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  - netfilter-persistent save
+
+  # --- /var/cache/nginx/public_reel (Phase 7 D-20 nginx cache zone) ---------
+  # ops/nginx/timeline.conf declares `proxy_cache_path /var/cache/nginx/public_reel`.
+  # Without the directory pre-created with www-data ownership, `nginx -t` errors
+  # `mkdir() failed (2: No such file or directory)` the first time the operator
+  # tries to validate after symlinking the config in Phase 8 Wave 2.
+  - mkdir -p /var/cache/nginx/public_reel
+  - chown -R www-data:www-data /var/cache/nginx/public_reel
+
+  # --- App directory + repo clone --------------------------------------------
+  # Pre-create /opt/timeline-revamp/.oci as ubuntu (for the operator's PEM scp
+  # later). The repo itself is cloned by `git clone` into /opt/timeline-revamp
+  # which must NOT pre-exist (clone refuses to populate a non-empty dir; that
+  # was Phase 8 Wave 3 bug #3). Drop the `|| true` so a real clone failure
+  # surfaces in /var/log/cloud-init-output.log instead of being swallowed.
+  - sudo -u ubuntu git clone ${repo_url} /opt/timeline-revamp
+  - sudo -u ubuntu mkdir -p /opt/timeline-revamp/.oci
+  - chmod 700 /opt/timeline-revamp/.oci
+
+final_message: "Cloud-init complete. SSH in, SCP .env + OCI PEM (chown 1001:1001), run docker compose up -d --build. See infra/DEPLOY.md."
