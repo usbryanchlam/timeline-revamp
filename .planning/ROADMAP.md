@@ -17,7 +17,7 @@ Twelve weekend phases turn a hardcoded reel prototype into a deployed multi-user
 - [ ] **Phase 5: City CRUD + map picker** - Click map → reverse-geocode → save. Reorder via deferred-unique transaction.
 - [x] **Phase 6: Photo upload pipeline** - HEIC convert, resize, EXIF strip, OCI PAR upload, thumbnails. (4 plans; +95 tests, 140→235; first parallel-agent wave; OCI CORS via S3-compat landmine documented)
 - [x] **Phase 7: Public URLs + handle reservation** - `/u/:handle` unauthenticated reel, handle picker, Nginx cache. (3 plans; +58 tests, 289→347 across the phase; double-Esc anti-modal-trap landmine fixed in UAT; 3 mobile UAT items defer to post-Phase-8)
-- [ ] **Phase 8: Deploy part 1** - OCI VM setup, Docker Compose, Nginx + Let's Encrypt, DNS cutover.
+- [x] **Phase 8: Deploy part 1** - OCI VM setup, Docker Compose, Nginx + Let's Encrypt, DNS cutover. (3 plans + 8.1 inserted; live at https://timeline.bryanlam.dev on 2026-05-30; 8 findings F1–F8 captured for follow-up)
 - [ ] **Phase 9: Deploy part 2 + empty/error states** - GitHub Actions CI, tagged auto-deploy, error UX. App live.
 - [ ] **Phase 10: MP4 ladder rung 1 (server-side)** - BullMQ + Puppeteer + FFmpeg. 90s benchmark gate.
 - [ ] **Phase 11: MP4 rung 2/3 OR mobile polish + a11y audit** - Branches on Phase 10 outcome.
@@ -180,7 +180,7 @@ Plans:
 Plans:
 - [x] 08-01: OCI VM provisioning + Docker Compose stack
 - [x] 08-02: Nginx reverse proxy + Let's Encrypt
-- [ ] 08-03: DNS cutover + smoke test
+- [x] 08-03: DNS cutover + smoke test (completed 2026-05-30; 10-gate smoke 9 pass + 1 partial; 8 findings F1-F8 captured in 08-03-SUMMARY.md)
 
 ### Phase 08.1: infra-terraform (INSERTED)
 

@@ -308,20 +308,56 @@ terraform output public_ip   # paste into your DNS provider's A-record for timel
 > pollutes state and the retry shell escapes the declarative model
 > (RESEARCH Pitfall 1).
 
-### Post-Provision: SCP `.env`
+### Post-Provision: SCP `.env` and OCI PEM
 
 Terraform does not manage `.env` secrets (D-08 — TF + secrets-in-state is
-an anti-pattern). After `terraform apply` succeeds, SCP `.env` from the
-laptop to the VM:
+an anti-pattern). After `terraform apply` succeeds, SCP `.env` AND the OCI
+API PEM from the laptop to the VM:
 
 ```bash
-scp .env ubuntu@$(cd infra/terraform && terraform output -raw public_ip):/opt/timeline-revamp/.env
-ssh ubuntu@$(cd infra/terraform && terraform output -raw public_ip) "chmod 600 /opt/timeline-revamp/.env"
+VM_IP=$(cd infra/terraform && terraform output -raw public_ip)
+
+# 1. SCP .env (your production-ready values — NOT .env.local; create a
+#    separate .env.prod and rename on the VM).
+scp .env.prod ubuntu@$VM_IP:/opt/timeline-revamp/.env
+
+# 2. Create .oci/ dir on the VM and SCP the PEM. The container runs as
+#    UID 1001 (Dockerfile's `app` user); the bind mount preserves host
+#    UIDs, so the PEM MUST be readable by UID 1001 or the api container
+#    crashes with EACCES on first OCI operation.
+ssh ubuntu@$VM_IP 'mkdir -p /opt/timeline-revamp/.oci'
+scp ~/.oci/timeline-revamp.pem ubuntu@$VM_IP:/opt/timeline-revamp/.oci/timeline-revamp.pem
+
+# 3. Lock down permissions. Note the PEM chown to UID 1001 — this is
+#    critical and was the cause of a Phase 8 Wave 3 EACCES bug. `ls`
+#    will display the owner as the literal number `1001` because the
+#    host has no user with that UID (it's the container's user, not the
+#    host's). That's expected and correct.
+ssh ubuntu@$VM_IP '
+  chmod 600 /opt/timeline-revamp/.env
+  sudo chown 1001:1001 /opt/timeline-revamp/.oci/timeline-revamp.pem
+  sudo chmod 400 /opt/timeline-revamp/.oci/timeline-revamp.pem
+'
 ```
 
-With Instance Principal in place (Plan 02), `.env` no longer needs
-`OCI_PRIVATE_KEY_PATH` / `OCI_USER_OCID` — the OCI SDK auto-detects via
-the instance metadata endpoint.
+**`.env` for production** — start from `.env.example` and override these
+keys for prod:
+- `POSTGRES_PASSWORD` — use a **URL-safe** value (`openssl rand -hex 32`,
+  NOT `-base64`, because `/`, `+`, `=` break the DATABASE_URL constructed
+  by interpolation in `docker-compose.prod.yml`).
+- `OCI_PRIVATE_KEY_PATH=/app/.oci/timeline-revamp.pem` — container-side
+  path, NOT your laptop path. The compose file bind-mounts `./.oci/` on
+  the VM at `/app/.oci/` in the container (read-only).
+- All Auth0 + OCI + VITE_* values can match dev unless you maintain
+  separate prod tenants.
+
+**Future hardening:** Once `server/oci/parClient.ts` is switched from
+`SimpleAuthenticationDetailsProvider` to
+`InstancePrincipalsAuthenticationDetailsProvider`, the PEM file is no
+longer needed in the container at all — the VM authenticates by being
+itself via the instance metadata endpoint. The IAM dynamic group + scoped
+policy that enable Instance Principal already exist (Phase 08.1-02). See
+`.planning/phases/08-deploy-part-1/.continue-here.md` followup F4.
 
 ## Nginx + Let's Encrypt
 

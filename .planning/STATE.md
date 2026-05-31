@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 08.1 context gathered
-last_updated: "2026-05-27T05:01:15.633Z"
-last_activity: 2026-05-27 -- Phase 08.1 execution started
+stopped_at: Phase 8 complete — v1 live at https://timeline.bryanlam.dev (2026-05-30)
+last_updated: "2026-05-30T20:30:00Z"
+last_activity: 2026-05-30 -- Phase 08-03 DNS cutover + smoke battery complete; site live
 progress:
   total_phases: 13
-  completed_phases: 6
-  total_plans: 26
-  completed_plans: 17
-  percent: 46
+  completed_phases: 8
+  total_plans: 29
+  completed_plans: 29
+  percent: 62
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 08.1 — infra-terraform
+**Current focus:** Phase 9 — Deploy part 2 (CI/CD + error states), pending. Item 1 + Item 2 polish items captured for follow-up sessions.
 
 ## Current Position
 
 Phase: 9
-Plan: Not started
+Plan: Not started — see `.planning/phases/08-deploy-part-1/.continue-here.md` for the cross-phase followup list before kicking off Phase 9 planning.
 Status: Ready to plan
-Last activity: 2026-05-28
+Last activity: 2026-05-30 — v1 live
 
 Progress: [███████░░░░░] 58% (7 of 12 phases complete)
 
