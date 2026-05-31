@@ -3,7 +3,7 @@
 # Cloud-init module execution order: write_files → set_timezone → groups → users →
 # packages (package_update, package_upgrade, packages) → runcmd.
 #
-# Phase 8.1.1 (2026-05-30): five bugs from Phase 8 Wave 3 SSH UAT fixed.
+# Phase 8.1.1 — six bugs from Phase 8 Wave 3 + 8.1.1 first-apply UAT fixed.
 # See .planning/phases/08-deploy-part-1/.continue-here.md F1 for the trail.
 #   1. docker-compose-plugin removed from packages: (not in jammy default repos);
 #      Docker's official apt repo added + the plugin installed in runcmd.
@@ -16,6 +16,25 @@
 #   4. /var/cache/nginx/public_reel pre-created so `nginx -t` doesn't fail
 #      after the operator symlinks ops/nginx/timeline.conf in Phase 8 Wave 2.
 #   5. (Out of scope here — operator scp's PEM as UID 1001 per DEPLOY.md.)
+#   6. (Added 2026-05-31, 8.1.1 first re-apply): bootcmd masks Ubuntu's
+#      apt-daily / unattended-upgrades services BEFORE the packages module
+#      runs. Without this, those services race cloud-init for the dpkg
+#      lock on first boot — first re-apply hit
+#      "TimeoutError('Could not get APT lock')" and the entire packages
+#      install + half of runcmd never ran. bootcmd executes earlier than
+#      both write_files and packages, so it runs first.
+
+bootcmd:
+  # Stop + mask the auto-update services that race cloud-init for the dpkg
+  # lock. `|| true` because on some images these units aren't installed
+  # (and `systemctl stop` of a nonexistent unit errors).
+  - systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+  - systemctl mask apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+  # Wait for any already-running apt/dpkg process to release the lock
+  # before proceeding. Bounded to 5 minutes so we don't hang cloud-init
+  # forever if something is genuinely stuck. fuser is part of the
+  # `psmisc` package which Ubuntu cloud images ship by default.
+  - timeout 300 bash -c 'while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 2; done' || true
 
 package_update: true
 package_upgrade: true
