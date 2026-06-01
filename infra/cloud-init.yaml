@@ -28,6 +28,13 @@
 #      owned mode 755 and `sudo -u ubuntu git clone repo /opt/...` fails
 #      "could not create work tree dir: Permission denied". My prior fix
 #      removed the pre-mkdir but didn't account for /opt's permissions.
+#   8. (Added 2026-06-01, Phase 9 F1.1): pre-create certbot TLS template
+#      files so `nginx -t` passes on first boot and `certbot --nginx`
+#      (NOT `--standalone`) works end-to-end. Without this, the operator
+#      had to certbot certonly --standalone before nginx -t would pass.
+#      Cost: ~30-90s extra for the openssl dhparam step on first boot
+#      (acceptable; runs once per VM lifetime per RESEARCH Pitfall 7).
+#      See .planning/phases/08-deploy-part-1/.continue-here.md F1.1.
 
 bootcmd:
   # Stop + mask the auto-update services that race cloud-init for the dpkg
@@ -100,6 +107,30 @@ runcmd:
   # tries to validate after symlinking the config in Phase 8 Wave 2.
   - mkdir -p /var/cache/nginx/public_reel
   - chown -R www-data:www-data /var/cache/nginx/public_reel
+
+  # --- Pre-create certbot TLS template files (F1.1 bootstrap chicken-egg) ---
+  # ops/nginx/timeline.conf carries certbot's TLS directives committed back via
+  # Phase 8.2 Option A. On a fresh VM these reference files that only exist
+  # AFTER certbot has run — chicken-and-egg: nginx -t fails on first boot
+  # because /etc/letsencrypt/options-ssl-nginx.conf is missing; the operator
+  # would have to run `certbot certonly --standalone` first to populate them.
+  # Pre-create here so `nginx -t` passes on first boot AND `certbot --nginx`
+  # works end-to-end without the standalone workaround.
+  #
+  # Source path: python3-certbot-nginx (line 50 of packages:) installs its
+  # template at /usr/lib/python3/dist-packages/certbot_nginx/_internal/tls_configs/
+  # on Ubuntu 22.04 jammy. The packages: module runs BEFORE runcmd, so the
+  # source path is guaranteed present when cp runs here.
+  #
+  # dhparam cost: openssl dhparam -out ... 2048 runs synchronously and takes
+  # ~30-90s on Ampere A1 arm64 (measured per .continue-here.md F1.1). Cloud-
+  # init blocks until it completes; downstream runcmd steps wait. Acceptable
+  # one-time cost — only runs on fresh VM boot (terraform taint && apply).
+  - install -d -m 0755 /etc/letsencrypt
+  - cp /usr/lib/python3/dist-packages/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf /etc/letsencrypt/options-ssl-nginx.conf
+  - chmod 0644 /etc/letsencrypt/options-ssl-nginx.conf
+  - openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
+  - chmod 0644 /etc/letsencrypt/ssl-dhparams.pem
 
   # --- App directory + repo clone --------------------------------------------
   # `/opt/` is owned by root with mode 755, so `sudo -u ubuntu git clone
