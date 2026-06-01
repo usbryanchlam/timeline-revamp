@@ -41,6 +41,13 @@ function bearer(c: Context): string | null {
   return token;
 }
 
+// F9: Auth0 access tokens don't carry the standard `email` claim by default.
+// The post-login Action `inject-email-into-access-token` (Auth0 Dashboard →
+// Actions → Flows → Login) sets a namespaced custom claim under this URL.
+// Namespace MUST be a URL with scheme — Auth0 reserves un-namespaced claims.
+// See .planning/phases/08-deploy-part-1/.continue-here.md F9 for the trail.
+const EMAIL_CLAIM = 'https://timeline.bryanlam.dev/email';
+
 interface Auth0Payload extends JWTPayload {
   sub?: string;
   email?: string;
@@ -57,7 +64,15 @@ export const requireJwt: MiddlewareHandler = async (c, next) => {
     const p = payload as Auth0Payload;
     if (!p.sub) return c.json({ error: 'token_missing_sub' }, 401);
     c.set('auth0Sub', p.sub);
-    c.set('auth0Email', p.email ?? '');
+    // F9: prefer the namespaced custom claim (post-Phase-9 access tokens);
+    // fall back to the standard `email` claim for tokens minted before the
+    // Action was attached (the brief in-flight window after deploy). Final
+    // fallback to empty string preserves the existing contract that
+    // lazyProvisionUser inserts users with an empty email when no value is
+    // available — the column is NOT NULL per DATA-01, and the F9 backfill
+    // SUMMARY documents the one-off UPDATE for the existing bryan row.
+    const email = ((payload as Record<string, unknown>)[EMAIL_CLAIM] as string | undefined) ?? p.email ?? '';
+    c.set('auth0Email', email);
     await next();
     return;
   } catch (err) {
