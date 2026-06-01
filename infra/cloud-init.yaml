@@ -23,6 +23,11 @@
 #      "TimeoutError('Could not get APT lock')" and the entire packages
 #      install + half of runcmd never ran. bootcmd executes earlier than
 #      both write_files and packages, so it runs first.
+#   7. (Added 2026-06-01, 8.1.1 second re-apply): /opt/timeline-revamp
+#      pre-created with `install -d -o ubuntu` because `/opt/` is root-
+#      owned mode 755 and `sudo -u ubuntu git clone repo /opt/...` fails
+#      "could not create work tree dir: Permission denied". My prior fix
+#      removed the pre-mkdir but didn't account for /opt's permissions.
 
 bootcmd:
   # Stop + mask the auto-update services that race cloud-init for the dpkg
@@ -97,13 +102,18 @@ runcmd:
   - chown -R www-data:www-data /var/cache/nginx/public_reel
 
   # --- App directory + repo clone --------------------------------------------
-  # Pre-create /opt/timeline-revamp/.oci as ubuntu (for the operator's PEM scp
-  # later). The repo itself is cloned by `git clone` into /opt/timeline-revamp
-  # which must NOT pre-exist (clone refuses to populate a non-empty dir; that
-  # was Phase 8 Wave 3 bug #3). Drop the `|| true` so a real clone failure
-  # surfaces in /var/log/cloud-init-output.log instead of being swallowed.
+  # `/opt/` is owned by root with mode 755, so `sudo -u ubuntu git clone
+  # repo /opt/timeline-revamp` fails: ubuntu has no write permission on
+  # /opt/. Pre-create the work-tree dir owned by ubuntu via root sudo
+  # install. git clone into a pre-existing EMPTY directory works fine —
+  # the "refuse to populate non-empty dir" rule was the original Phase 8
+  # Wave 3 bug (the placeholder write_files entry seeded the dir
+  # non-empty); now that write_files is removed, the empty pre-created
+  # dir is the correct state for the clone to populate. `|| true`
+  # intentionally NOT included so a real clone failure surfaces in
+  # /var/log/cloud-init-output.log.
+  - install -d -o ubuntu -g ubuntu -m 0755 /opt/timeline-revamp
   - sudo -u ubuntu git clone ${repo_url} /opt/timeline-revamp
-  - sudo -u ubuntu mkdir -p /opt/timeline-revamp/.oci
-  - chmod 700 /opt/timeline-revamp/.oci
+  - sudo -u ubuntu install -d -o ubuntu -g ubuntu -m 0700 /opt/timeline-revamp/.oci
 
 final_message: "Cloud-init complete. SSH in, SCP .env + OCI PEM (chown 1001:1001), run docker compose up -d --build. See infra/DEPLOY.md."
