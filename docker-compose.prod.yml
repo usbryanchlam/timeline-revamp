@@ -1,10 +1,22 @@
 # Production override layered on top of docker-compose.yml.
 # Compose merges by service key, so this file only declares the deltas:
 #   - postgres: strip the dev port publish (D-11), restart=always.
-#   - api: new service definition (dev doesn't run the API in compose;
-#     dev uses tsx watch on the host instead).
+#   - api: pulled from OCIR via image: ${OCIR_REGISTRY}/${OCIR_REPO}:${IMAGE_TAG}
+#     (Phase 9 — was previously built locally via build: + VITE_* args).
 #
-# Invoke with:
+# CI/CD invocation (.github/workflows/deploy.yml):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#     --env-file .env --env-file .env.tag pull api
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#     --env-file .env --env-file .env.tag run --rm api bun run db:migrate
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#     --env-file .env --env-file .env.tag up -d
+#
+# .env.tag MUST come AFTER .env in --env-file order — Compose treats later
+# files as wins for duplicate keys (RESEARCH Pitfall 3).
+#
+# Manual local-build invocation (emergency fallback, still supported because
+# docker-compose.yml has the build: in its own api service definition):
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 services:
@@ -17,17 +29,14 @@ services:
     restart: always
 
   api:
-    build:
-      context: .
-      args:
-        # VITE_* are inlined into dist/assets/*.js at vite build time.
-        # See feedback_dual_runtime_env.md: dual-runtime projects must
-        # populate both unprefixed (runtime) and VITE_* (build-time)
-        # copies in the .env on the VM. Missing args → broken bundle.
-        VITE_MAPTILER_KEY: ${VITE_MAPTILER_KEY}
-        VITE_AUTH0_DOMAIN: ${VITE_AUTH0_DOMAIN}
-        VITE_AUTH0_CLIENT_ID: ${VITE_AUTH0_CLIENT_ID}
-        VITE_AUTH0_AUDIENCE: ${VITE_AUTH0_AUDIENCE}
+    # Phase 9: image is pre-built by .github/workflows/deploy.yml and pushed
+    # to OCIR. The deploy step writes IMAGE_TAG=vX.Y.Z to .env.tag on the VM
+    # and invokes compose with `--env-file .env --env-file .env.tag` so
+    # IMAGE_TAG (and OCIR_REGISTRY/OCIR_REPO) resolve at `compose pull` time.
+    # See feedback_dual_runtime_env.md: VITE_* are inlined into dist/ at
+    # build time IN THE GHA RUNNER (build-args), not here. They no longer
+    # need to be passed as compose build-args because compose no longer builds.
+    image: ${OCIR_REGISTRY}/${OCIR_REPO}:${IMAGE_TAG}
     env_file: .env
     environment:
       NODE_ENV: production
