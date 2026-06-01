@@ -777,14 +777,142 @@ When Phase 10 lands, `docker-compose.prod.yml` gains a `redis:` service
 on the internal Docker network (no host port publish, same pattern as
 Postgres). No Nginx changes are anticipated.
 
-## Phase 9 — what changes from this runbook
+## CI/CD
 
-Phase 9 automates the manual ship loop:
-- GitHub Actions builds the image on `git push --tags vX.Y.Z`.
-- The image is pushed to OCI Container Registry.
-- A deploy hook on the VM pulls the new tag and runs
-  `docker compose pull && docker compose up -d`.
+Phase 9 automates the manual deploy loop documented in the sections above.
+`.github/workflows/deploy.yml` runs on three triggers:
 
-When that lands, "Common Operations → Ship a new version" above changes
-from manual `git pull && docker compose up -d --build` to "push a tag
-and watch the actions tab".
+- **`pull_request`** → verify only (`bun run typecheck && bun run test`). No image push, no deploy.
+- **`push` to `main`** → verify + build-and-push (tags `main-<sha>` + `latest` to OCIR). No deploy.
+- **`push` of a `v*` tag** → verify + build-and-push (tag `vX.Y.Z`) + deploy (gated by `environment: production` reviewer).
+
+Tag-driven deploy is the only event that SSHes into the VM and flips the running image. `latest` mirrors the most recent main-push and is NEVER used by the deploy step (rollback by re-running with an older tag would otherwise be defeated).
+
+### Prerequisites
+
+Before the first deploy run:
+
+1. **Dedicated deploy SSH key** (separate from the operator's personal key):
+   ```bash
+   ssh-keygen -t ed25519 -f gha-deploy-key -C "gha-deploy-$(date +%Y%m%d)"
+   ssh-copy-id -i gha-deploy-key.pub ubuntu@<VM_IP>
+   # OR manually: cat gha-deploy-key.pub | ssh ubuntu@<VM_IP> 'cat >> ~/.ssh/authorized_keys'
+   ```
+   Paste the PRIVATE key (`gha-deploy-key` contents) into GitHub repo secret `DEPLOY_SSH_KEY`.
+
+2. **OCIR auth token** (OCI Console → Profile → Auth Tokens → Generate token; record once):
+   - Paste into GitHub repo secret `OCIR_AUTH_TOKEN`.
+   - Set repo variable `OCIR_USER` to `<tenancy-namespace>/<user-email>` form (e.g. `axqv9r2pkn0o/oracleidentitycloudservice/usbryanchlam@gmail.com`).
+   - Set repo variable `OCI_REGION` to your region code (e.g. `iad`).
+   - Set repo variable `OCI_NAMESPACE` to your tenancy namespace.
+
+3. **`production` GitHub environment** with required reviewer:
+   - Repo Settings → Environments → New environment → `production`
+   - Required reviewer: repo owner (`usbryanchlam`)
+   - The deploy job pauses on this gate; click "Approve and deploy" in the workflow run UI.
+
+4. **Build-time VITE_* values** (inlined into `dist/` at GHA buildx time):
+   - Secret: `VITE_MAPTILER_KEY` (existing MapTiler key)
+   - Vars: `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_AUDIENCE` (same values as `.env` on the VM)
+
+### GitHub Secrets and Variables Reference
+
+| Secret | Source | Purpose |
+|---|---|---|
+| `OCIR_AUTH_TOKEN` | OCI Console → Profile → Auth Tokens | Authenticate `docker login` + `docker push` to OCIR |
+| `DEPLOY_SSH_KEY` | `gha-deploy-key` private key contents (ed25519) | `appleboy/ssh-action@v1` SSH-in to the VM |
+| `DEPLOY_HOST` | OCI Reserved Public IP (Phase 8.1 output: 64.181.252.226) | Target host for the SSH deploy |
+| `VITE_MAPTILER_KEY` | MapTiler dashboard | Inlined into `dist/` at buildx time |
+
+| Variable | Value | Purpose |
+|---|---|---|
+| `OCIR_USER` | `<tenancy-namespace>/<user-email>` (e.g. `axqv9r2pkn0o/oracleidentitycloudservice/usbryanchlam@gmail.com`) | OCIR docker-login username |
+| `OCI_REGION` | e.g. `iad` | First segment of OCIR FQDN (`iad.ocir.io`) |
+| `OCI_NAMESPACE` | OCI tenancy namespace | Path segment in OCIR FQDN (`iad.ocir.io/<namespace>/timeline-revamp`) |
+| `VITE_AUTH0_DOMAIN` | Same as VM `.env` | Build-time inline |
+| `VITE_AUTH0_CLIENT_ID` | Same as VM `.env` | Build-time inline |
+| `VITE_AUTH0_AUDIENCE` | Same as VM `.env` | Build-time inline |
+
+### Standard Deploy
+
+```bash
+# 1. Bump package.json version (the tag-match guard requires this).
+#    Choose the right semver bump (patch/minor/major); commit the bump.
+npm version patch --no-git-tag-version   # or manually edit package.json
+git add package.json && git commit -m "chore: bump to v0.1.2 for release"
+git push origin main
+
+# 2. Tag the released commit and push the tag.
+git tag v0.1.2
+git push origin v0.1.2
+
+# 3. Watch the workflow at github.com/usbryanchlam/timeline-revamp/actions.
+#    The deploy job pauses on the `production` environment gate.
+#    Approve in the workflow run UI.
+
+# 4. After deploy job goes green, /api/health smoke runs from the GHA runner.
+#    Final verification:
+curl -fsSL https://timeline.bryanlam.dev/api/health
+```
+
+### Rollback (via workflow_dispatch)
+
+```bash
+# Trigger via gh CLI:
+gh workflow run deploy.yml -f tag=v0.1.1
+
+# OR via web UI: github.com/usbryanchlam/timeline-revamp/actions/workflows/deploy.yml
+# → "Run workflow" → enter `v0.1.1` as the tag input.
+```
+
+The rollback path:
+
+1. Skips verify (image already verified at original build).
+2. Skips build-and-push (image already in OCIR).
+3. Runs only the deploy job, pulling the existing `vX.Y.Z` image from OCIR and flipping the container.
+4. Migration step (`docker compose run --rm api bun run db:migrate`) is a no-op if schema is already at the target version. If the old image is incompatible with the current schema (rare; schema is forward-compatible by Drizzle convention), restore the schema manually FIRST (see `## Manual schema rollback` below — out of scope for this section).
+
+Target recovery time: <5 min wall clock from `gh workflow run` to `/api/health` 200.
+
+### Troubleshooting
+
+**Tag-match guard fails** (`Tag vX.Y.Z does not match package.json version`):
+
+The released commit's `package.json.version` is out-of-sync with the tag name. Recovery:
+
+```bash
+# Delete the bad tag (local + remote):
+git tag -d v0.1.2
+git push --delete origin v0.1.2
+
+# Bump package.json and re-tag:
+git checkout main
+git pull
+# edit package.json: "version": "0.1.2"
+git add package.json && git commit -m "chore: bump to v0.1.2"
+git push
+git tag v0.1.2
+git push origin v0.1.2
+```
+
+**OCIR auth token expired** (`docker push` fails with `denied: BasicAuth invalid`):
+
+OCIR auth tokens persist until manually revoked, but if the operator rotated/revoked the token without updating the secret:
+
+1. OCI Console → Profile → Auth Tokens → Generate new token.
+2. GitHub repo → Settings → Secrets → Update `OCIR_AUTH_TOKEN` with the new value.
+3. Re-run the failed workflow.
+
+**Deploy job times out on the SSH step**:
+
+The VM is unreachable on port 22 (network rule changed, IP changed, firewall added). Verify the Reserved Public IP is still 64.181.252.226 and that port 22 is open in the OCI Security List. If the IP changed, update repo secret `DEPLOY_HOST`.
+
+**/api/health smoke fails post-deploy**:
+
+The container started but `/api/health` returns 503 (DB unreachable) or non-2xx. SSH into the VM, run `docker compose logs api --tail=200` to read the error. Common causes: missing env var, schema drift the migration didn't catch, OCI PAR auth failure. The OLD container is NOT automatically reverted — operator runs `gh workflow run deploy.yml -f tag=v0.1.1` to roll back.
+
+### Notes
+
+- Auto-rollback on smoke failure is intentionally OFF in v1. A failed health check fails the job and pages the operator, but the old image isn't restored automatically — that level of orchestration adds blue/green complexity that's out of scope per CONTEXT.md.
+- Build time on QEMU arm64: 8-15 min cold, 3-6 min warm (cache hit). GHA cache backend persists BuildKit layers across runs; first PR after a `bun.lock` bump is slow.
+- The `latest` tag in OCIR ALWAYS mirrors the most recent main-push, NEVER the most recent tag. Source of truth for "what version is in production" is git tags, not OCIR tags.
