@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 
 // ---------------------------------------------------------------------------
 // Mocks — prevent WASM / network loading in tests
@@ -19,10 +20,13 @@ vi.mock('@/photos/canvasResize', () => ({
 const mockAdd = vi.fn().mockReturnValue([]);
 const mockRetry = vi.fn();
 const mockCancelAll = vi.fn();
+// Captures the most recent onItemUpdate so tests can drive queue updates
+// without exercising the real createUploadQueue / pLimit pipeline.
+const capturedOnItemUpdate: { current: ((item: unknown) => void) | null } = { current: null };
 
 vi.mock('@/photos/uploadQueue', () => ({
-  createUploadQueue: vi.fn().mockImplementation((opts: { onItemUpdate: unknown; runOne: unknown }) => {
-    void opts; // suppress unused warning
+  createUploadQueue: vi.fn().mockImplementation((opts: { onItemUpdate: (item: unknown) => void; runOne: unknown }) => {
+    capturedOnItemUpdate.current = opts.onItemUpdate;
     return { add: mockAdd, retry: mockRetry, cancelAll: mockCancelAll };
   }),
   xhrUpload: vi.fn().mockResolvedValue(undefined),
@@ -110,5 +114,88 @@ describe('PhotoUploader', () => {
     );
     // No items initially — just confirm the list container is rendered
     expect(container.querySelector('ul')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ERR-01 retry tile UI + StrictMode safety
+// ---------------------------------------------------------------------------
+
+describe('PhotoUploader — ERR-01 retrying tile UI', () => {
+  let setIntervalSpy: ReturnType<typeof vi.spyOn>;
+  let clearIntervalSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    setIntervalSpy = vi.spyOn(window, 'setInterval');
+    clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+    capturedOnItemUpdate.current = null;
+  });
+
+  afterEach(() => {
+    setIntervalSpy.mockRestore();
+    clearIntervalSpy.mockRestore();
+  });
+
+  it('renders the amber retry tile with "Retrying in {N}s…" copy and aria-live polite', async () => {
+    const { rerender } = render(
+      <PhotoUploader cityId="city-1" remainingCap={10} onUploaded={vi.fn()} />,
+    );
+    // Drive an item to retrying via the captured queue callback.
+    const onItemUpdate = capturedOnItemUpdate.current!;
+    expect(onItemUpdate).not.toBeNull();
+    const nextAttemptAt = Date.now() + 2000;
+    onItemUpdate({
+      id: 'i1',
+      file: new File(['x'], 'a.jpg', { type: 'image/jpeg' }),
+      status: { kind: 'retrying', attempt: 1, nextAttemptAt },
+    });
+    // Force a re-render so React processes the state update set inside onItemUpdate.
+    rerender(<PhotoUploader cityId="city-1" remainingCap={10} onUploaded={vi.fn()} />);
+
+    const caption = await screen.findByText(/retrying in/i);
+    expect(caption).toBeTruthy();
+    expect(caption.getAttribute('aria-live')).toBe('polite');
+    expect(caption.className).toContain('text-amber-500');
+  });
+
+  it('W5 StrictMode safety: setInterval calls equal the number of retrying batches, not 2N', async () => {
+    // Render in StrictMode: React will double-invoke effects on mount in dev.
+    // The countdown effect is guarded by items.some(...) and uses a cleanup
+    // function that clearInterval the previous handle, so the net result must
+    // be exactly ONE active interval for a single batch of retrying items.
+    const { rerender } = render(
+      <StrictMode>
+        <PhotoUploader cityId="city-1" remainingCap={10} onUploaded={vi.fn()} />
+      </StrictMode>,
+    );
+
+    // No retrying items yet -> no setInterval at all (guard short-circuits).
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+
+    const onItemUpdate = capturedOnItemUpdate.current!;
+    const nextAttemptAt = Date.now() + 2000;
+    onItemUpdate({
+      id: 'i1',
+      file: new File(['x'], 'a.jpg', { type: 'image/jpeg' }),
+      status: { kind: 'retrying', attempt: 1, nextAttemptAt },
+    });
+
+    rerender(
+      <StrictMode>
+        <PhotoUploader cityId="city-1" remainingCap={10} onUploaded={vi.fn()} />
+      </StrictMode>,
+    );
+
+    // Wait a microtask for React to flush the effect (and StrictMode's
+    // double-invoke + cleanup) — the calls/cleared deltas must net to ONE
+    // active handle, NOT 2N.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const intervalsStarted = setIntervalSpy.mock.calls.length;
+    const intervalsCleared = clearIntervalSpy.mock.calls.length;
+    // Net active = started - cleared. For a single batch of retrying items
+    // under StrictMode the diff must be exactly 1 (no leaked interval).
+    expect(intervalsStarted - intervalsCleared).toBe(1);
   });
 });

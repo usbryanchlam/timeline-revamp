@@ -52,7 +52,7 @@ export function AppReelRoute() {
     return (
       <div className="app-reel-host h-[100dvh] bg-bg flex items-center justify-center p-6">
         <div className="space-y-4 text-center max-w-sm">
-          <h2 className="text-display text-2xl">Your reel will appear here.</h2>
+          <h2 className="text-display text-2xl">No trips yet.</h2>
           <p className="text-ink-mute">
             Add your first city to start the camera flying.
           </p>
