@@ -214,11 +214,11 @@ Plans:
 Plans:
 
 **Wave 1** *(parallel — disjoint file trees)*
-- [ ] 09-01-PLAN.md — Tag-driven CI/CD: .github/workflows/deploy.yml (verify + arm64 buildx + appleboy ssh-action) + docker-compose.prod.yml image-pin + infra/DEPLOY.md ## CI/CD section [DEPLOY-03, DEPLOY-04]
-- [ ] 09-02-PLAN.md — Production middleware + pre-CI infra cleanup: server/index.ts (hono/request-id + app.onError) + server/auth/jwt.ts (F9 namespaced email claim w/ fallback) + infra/cloud-init.yaml (F1.1 dhparam + options-ssl-nginx.conf pre-create) + 2 new test files + 1 extended test file [DEPLOY-06]
+- [x] 09-01-PLAN.md — Tag-driven CI/CD: .github/workflows/deploy.yml (verify + arm64 buildx + appleboy ssh-action) + docker-compose.prod.yml image-pin + infra/DEPLOY.md ## CI/CD section [DEPLOY-03, DEPLOY-04]
+- [x] 09-02-PLAN.md — Production middleware + pre-CI infra cleanup: server/index.ts (hono/request-id + app.onError) + server/auth/jwt.ts (F9 namespaced email claim w/ fallback) + infra/cloud-init.yaml (F1.1 dhparam + options-ssl-nginx.conf pre-create) + 2 new test files + 1 extended test file [DEPLOY-06]
 
 **Wave 2** *(depends on 09-02 for server error contract used in retry UI)*
-- [ ] 09-03-PLAN.md — Error/empty state UX: src/photos/retry.ts (NEW [2000,4000,8000] backoff + classifier) + uploadQueue.ts retry loop + PhotoUploader retrying tile + src/reel/osmRasterStyle.ts (NEW) + MapCanvas 429 fallback + MapFallbackBanner (NEW amber border banner) + AppReelRoute empty card copy edit + TripsRoute bottom-overlay card replacing glass-pill + 5 new test files [ERR-01, ERR-03, ERR-04]
+- [x] 09-03-PLAN.md — Error/empty state UX: src/photos/retry.ts (NEW [2000,4000,8000] backoff + classifier) + uploadQueue.ts retry loop + PhotoUploader retrying tile + src/reel/osmRasterStyle.ts (NEW) + MapCanvas 429 fallback + MapFallbackBanner (NEW amber border banner) + AppReelRoute empty card copy edit + TripsRoute bottom-overlay card replacing glass-pill + 5 new test files [ERR-01, ERR-03, ERR-04]
 
 *ERR-02 deferred to Phase 10 per CONTEXT D-X (no Redis/BullMQ + MP4 render lifecycle yet — Phase 10 ships).*
 

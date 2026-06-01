@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 9 context gathered
-last_updated: "2026-06-01T21:02:45.873Z"
-last_activity: 2026-05-30 — v1 live
+status: complete
+stopped_at: Phase 9 verified (human_needed — operator setup pending)
+last_updated: "2026-06-01T22:30:00.000Z"
+last_activity: 2026-06-01 -- Phase 09 verified
 progress:
   total_phases: 13
-  completed_phases: 7
-  total_plans: 26
-  completed_plans: 21
-  percent: 81
+  completed_phases: 8
+  total_plans: 29
+  completed_plans: 24
+  percent: 83
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 9 — Deploy part 2 (CI/CD + error states), pending. Item 1 + Item 2 polish items captured for follow-up sessions.
+**Current focus:** Phase 09 complete (verified — operator setup pending). Next: Phase 10 (Redis + BullMQ + MP4 render pipeline; ERR-02 lands here).
 
 ## Current Position
 
-Phase: 9
-Plan: Not started — see `.planning/phases/08-deploy-part-1/.continue-here.md` for the cross-phase followup list before kicking off Phase 9 planning.
-Status: Ready to plan
-Last activity: 2026-05-30 — v1 live
+Phase: 09 (deploy-part-2-empty-error-states) — VERIFIED (`human_needed`)
+Plan: 3 of 3 complete
+Status: Phase 09 implementation shipped; awaiting operator setup punchlist (GH secrets+vars+production env, Auth0 Action attach, first tag push, optional F1.1 rebuild verify)
+Last activity: 2026-06-01 -- Phase 09 verified
 
-Progress: [███████░░░░░] 58% (7 of 12 phases complete)
+Progress: [████████░░░░] 67% (8 of 12 phases complete)
 
 ## Performance Metrics
 
