@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { UploadQueueItem } from './uploadQueue.js';
+import { BACKOFF_MS } from './retry.js';
 
 // ---------------------------------------------------------------------------
 // createUploadQueue — concurrency tests
@@ -236,5 +237,167 @@ describe('xhrUpload', () => {
         onProgress: vi.fn(),
       }),
     ).rejects.toThrow('Network error');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createUploadQueue — ERR-01 retry loop tests
+// ---------------------------------------------------------------------------
+
+describe('createUploadQueue — ERR-01 retry loop', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.resetModules();
+  });
+
+  function makeFile(name = 'a.jpg'): File {
+    return new File([new Uint8Array([1, 2, 3])], name, { type: 'image/jpeg' });
+  }
+
+  it('auto-retries transient failures and stops emitting failed when runOne eventually resolves', async () => {
+    const { createUploadQueue } = await import('./uploadQueue.js');
+
+    const updates: UploadQueueItem[] = [];
+    let calls = 0;
+    const runOne = vi.fn(async () => {
+      calls++;
+      if (calls < 4) throw new Error('Network error');
+      // 4th call succeeds
+    });
+    const q = createUploadQueue({
+      concurrency: 3,
+      onItemUpdate: (it) => updates.push(it),
+      runOne,
+    });
+    q.add([makeFile()]);
+
+    // Drain all 3 backoffs.
+    for (const ms of BACKOFF_MS) await vi.advanceTimersByTimeAsync(ms);
+
+    expect(calls).toBe(4);
+    // No 'failed' update emitted by the queue itself; success path returns silently
+    // (consumer's runOne is expected to set terminal 'done' via setItemStatus).
+    expect(updates.some((u) => u.status.kind === 'failed')).toBe(false);
+    const retryingUpdates = updates.filter((u) => u.status.kind === 'retrying');
+    expect(retryingUpdates.length).toBe(3);
+  });
+
+  it('flips to failed after MAX_AUTO_RETRIES consecutive transient failures', async () => {
+    const { createUploadQueue } = await import('./uploadQueue.js');
+
+    const updates: UploadQueueItem[] = [];
+    const runOne = vi.fn(async () => {
+      throw new Error('HTTP 429');
+    });
+    const q = createUploadQueue({
+      concurrency: 3,
+      onItemUpdate: (it) => updates.push(it),
+      runOne,
+    });
+    q.add([makeFile()]);
+
+    for (const ms of BACKOFF_MS) await vi.advanceTimersByTimeAsync(ms);
+
+    // Total calls: 1 initial + 3 retries = 4.
+    expect(runOne).toHaveBeenCalledTimes(4);
+    const lastUpdate = updates[updates.length - 1]!;
+    expect(lastUpdate.status.kind).toBe('failed');
+    if (lastUpdate.status.kind === 'failed') {
+      expect(lastUpdate.status.reason).toBe('HTTP 429');
+    }
+  });
+
+  it('terminal-too-large (HTTP 413) skips auto-retry', async () => {
+    const { createUploadQueue } = await import('./uploadQueue.js');
+
+    const updates: UploadQueueItem[] = [];
+    const runOne = vi.fn(async () => {
+      throw new Error('HTTP 413');
+    });
+    const q = createUploadQueue({
+      concurrency: 3,
+      onItemUpdate: (it) => updates.push(it),
+      runOne,
+    });
+    q.add([makeFile()]);
+
+    await vi.advanceTimersByTimeAsync(BACKOFF_MS[BACKOFF_MS.length - 1]!);
+    expect(runOne).toHaveBeenCalledTimes(1);
+    expect(updates.some((u) => u.status.kind === 'failed')).toBe(true);
+    expect(updates.some((u) => u.status.kind === 'retrying')).toBe(false);
+  });
+
+  it('terminal-other (HTTP 403) skips auto-retry', async () => {
+    const { createUploadQueue } = await import('./uploadQueue.js');
+
+    const runOne = vi.fn(async () => {
+      throw new Error('HTTP 403');
+    });
+    const updates: UploadQueueItem[] = [];
+    const q = createUploadQueue({
+      concurrency: 3,
+      onItemUpdate: (it) => updates.push(it),
+      runOne,
+    });
+    q.add([makeFile()]);
+    await vi.advanceTimersByTimeAsync(BACKOFF_MS[BACKOFF_MS.length - 1]!);
+    expect(runOne).toHaveBeenCalledTimes(1);
+    expect(updates.some((u) => u.status.kind === 'retrying')).toBe(false);
+  });
+
+  it('manual retry on failed re-enters a fresh attempt loop', async () => {
+    const { createUploadQueue } = await import('./uploadQueue.js');
+
+    let phase = 'fail';
+    const runOne = vi.fn(async () => {
+      if (phase === 'fail') throw new Error('Network error');
+      // After phase flips, succeed.
+    });
+    const updates: UploadQueueItem[] = [];
+    const q = createUploadQueue({
+      concurrency: 3,
+      onItemUpdate: (it) => updates.push(it),
+      runOne,
+    });
+    const added = q.add([makeFile()]);
+    const id = added[0]!.id;
+
+    // Drain initial + 3 retries -> failed.
+    for (const ms of BACKOFF_MS) await vi.advanceTimersByTimeAsync(ms);
+    expect(runOne).toHaveBeenCalledTimes(4);
+
+    // Flip phase, manual retry — fresh attempt=0 loop.
+    phase = 'success';
+    q.retry(id);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(runOne).toHaveBeenCalledTimes(5);
+  });
+
+  it('cancelAll exits the retry sleep cleanly', async () => {
+    const { createUploadQueue } = await import('./uploadQueue.js');
+
+    const runOne = vi.fn(async () => {
+      throw new Error('Network error');
+    });
+    const updates: UploadQueueItem[] = [];
+    const q = createUploadQueue({
+      concurrency: 3,
+      onItemUpdate: (it) => updates.push(it),
+      runOne,
+    });
+    q.add([makeFile()]);
+
+    // Let the first failure record + enter the first sleep.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(runOne).toHaveBeenCalledTimes(1);
+
+    q.cancelAll();
+    // Advance through all backoffs — no further runOne calls.
+    for (const ms of BACKOFF_MS) await vi.advanceTimersByTimeAsync(ms);
+    expect(runOne).toHaveBeenCalledTimes(1);
   });
 });
