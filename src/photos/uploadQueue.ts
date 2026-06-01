@@ -11,6 +11,7 @@
  */
 
 import pLimit from 'p-limit';
+import { BACKOFF_MS, MAX_AUTO_RETRIES, classifyError, sleep } from './retry';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,6 +21,7 @@ export type UploadStatus =
   | { readonly kind: 'queued' }
   | { readonly kind: 'converting' }
   | { readonly kind: 'uploading'; readonly progress: number } // 0..1
+  | { readonly kind: 'retrying'; readonly attempt: number; readonly nextAttemptAt: number }
   | { readonly kind: 'done' }
   | { readonly kind: 'failed'; readonly reason: string };
 
@@ -101,11 +103,32 @@ export function createUploadQueue(opts: CreateUploadQueueOptions): UploadQueueHa
 
   function scheduleOne(item: UploadQueueItem): void {
     void limit(async () => {
-      try {
-        await runOne(item, abortFlag);
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        updateItem(item.id, { kind: 'failed', reason });
+      for (let attempt = 0; attempt <= MAX_AUTO_RETRIES; attempt++) {
+        try {
+          await runOne(item, abortFlag);
+          return; // success — runOne sets terminal state (done) via its onProgress->updateItem path
+        } catch (err) {
+          // Operator-cancelled — bail without re-scheduling.
+          if (abortFlag.aborted) return;
+
+          const klass = classifyError(err);
+          // Terminal OR exhausted retries -> flip to failed and stop.
+          if (klass !== 'transient' || attempt === MAX_AUTO_RETRIES) {
+            const reason = err instanceof Error ? err.message : String(err);
+            updateItem(item.id, { kind: 'failed', reason });
+            return;
+          }
+
+          // Transient + room to retry — surface countdown state, then back off.
+          const delay = BACKOFF_MS[attempt]!;
+          updateItem(item.id, {
+            kind: 'retrying',
+            attempt: attempt + 1,
+            nextAttemptAt: Date.now() + delay,
+          });
+          await sleep(delay);
+          if (abortFlag.aborted) return;
+        }
       }
     });
   }

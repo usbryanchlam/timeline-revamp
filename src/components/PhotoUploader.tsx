@@ -19,6 +19,10 @@ interface PhotoUploaderProps {
 
 export function PhotoUploader({ cityId, remainingCap, onUploaded }: PhotoUploaderProps) {
   const [items, setItems] = useState<readonly UploadQueueItem[]>([]);
+  // ERR-01: 1Hz tick re-render so the 'Retrying in {N}s…' caption recomputes
+  // from Date.now() without storing a derived clock in state. Value is unused;
+  // only the setter is read (force re-render).
+  const [, setCountdownTick] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queueRef = useRef<UploadQueueHandle | null>(null);
   const apiRef = useRef(useApi());
@@ -108,6 +112,17 @@ export function PhotoUploader({ cityId, remainingCap, onUploaded }: PhotoUploade
     };
   }, [runOne]);
 
+  // ERR-01: 1Hz tick — only mounted when at least one item is in 'retrying' state.
+  // Cleanup on items change / unmount keeps StrictMode double-mount safe (the
+  // useEffect cleanup naturally clears the interval before the second mount
+  // re-anchors a new one).
+  useEffect(() => {
+    const anyRetrying = items.some((it) => it.status.kind === 'retrying');
+    if (!anyRetrying) return;
+    const id = window.setInterval(() => setCountdownTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [items]);
+
   const onFilesPicked = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     e.target.value = ''; // allow re-selecting the same file later
@@ -162,6 +177,17 @@ export function PhotoUploader({ cityId, remainingCap, onUploaded }: PhotoUploade
             )}
             {it.status.kind === 'converting' && (
               <span className="text-ink-mute">Converting…</span>
+            )}
+            {it.status.kind === 'retrying' && (
+              <div className="flex items-center gap-2 text-[13px] border border-amber-500 rounded-md px-2 py-1">
+                <span
+                  aria-hidden="true"
+                  className="inline-block w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"
+                />
+                <span className="text-amber-500" aria-live="polite">
+                  Retrying in {Math.max(0, Math.ceil((it.status.nextAttemptAt - Date.now()) / 1000))}s…
+                </span>
+              </div>
             )}
             {it.status.kind === 'done' && (
               <span className="text-success-500">Done</span>
