@@ -22,11 +22,11 @@ describe('AppReelRoute — ERR-04 empty state (CONTEXT-locked copy)', () => {
         React.createElement(AppReelRoute, null),
       ),
     );
-    expect(screen.getByRole('heading', { name: /no trips yet\./i })).toBeInTheDocument();
-    expect(screen.getByText(/add your first city to start the camera flying\./i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /no trips yet\./i })).toBeTruthy();
+    expect(screen.getByText(/add your first city to start the camera flying\./i)).toBeTruthy();
     const cta = screen.getByRole('link', { name: /add a city/i });
-    expect(cta).toBeInTheDocument();
-    expect(cta).toHaveAttribute('href', '/app/trips');
+    expect(cta).toBeTruthy();
+    expect(cta.getAttribute('href')).toBe('/app/trips');
     expect(cta.className).toContain('bg-amber-500');
   });
 
@@ -36,6 +36,6 @@ describe('AppReelRoute — ERR-04 empty state (CONTEXT-locked copy)', () => {
         React.createElement(AppReelRoute, null),
       ),
     );
-    expect(screen.queryByText(/your reel will appear here\./i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/your reel will appear here\./i)).toBeNull();
   });
 });

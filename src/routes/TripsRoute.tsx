@@ -123,8 +123,11 @@ export function TripsRoute() {
             onCityClick={handleCityClick}
           />
           {empty && (
-            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 mx-auto w-max max-w-[90%] glass-pill px-4 py-3 rounded-full text-ink text-sm pointer-events-none">
-              Drop a pin on the map to start your reel
+            <div
+              className="absolute inset-x-0 bottom-6 mx-auto w-max max-w-[90%] bg-bg-elev border border-line rounded-2xl px-5 py-4 text-center shadow-xl pointer-events-none"
+            >
+              <p className="text-ink mb-1">Tap the map to add your first stop.</p>
+              <span aria-hidden="true" className="inline-block text-amber-500 text-xl">↑</span>
             </div>
           )}
         </div>

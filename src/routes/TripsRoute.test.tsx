@@ -47,9 +47,9 @@ describe('TripsRoute — /app/trips 0-city empty-state polish', () => {
         React.createElement(TripsRoute, null),
       ),
     );
-    expect(screen.getByText(/tap the map to add your first stop\./i)).toBeInTheDocument();
+    expect(screen.getByText(/tap the map to add your first stop\./i)).toBeTruthy();
     // Amber arrow glyph
-    expect(screen.getByText('↑')).toBeInTheDocument();
+    expect(screen.getByText('↑')).toBeTruthy();
   });
 
   it('does NOT render the pre-Phase-9 pill copy', () => {
@@ -59,7 +59,7 @@ describe('TripsRoute — /app/trips 0-city empty-state polish', () => {
         React.createElement(TripsRoute, null),
       ),
     );
-    expect(screen.queryByText(/drop a pin on the map to start your reel/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/drop a pin on the map to start your reel/i)).toBeNull();
   });
 
   it('does NOT render the empty card when cities are present', () => {
@@ -69,7 +69,7 @@ describe('TripsRoute — /app/trips 0-city empty-state polish', () => {
         React.createElement(TripsRoute, null),
       ),
     );
-    expect(screen.queryByText(/tap the map to add your first stop\./i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/tap the map to add your first stop\./i)).toBeNull();
   });
 
   it('empty card has pointer-events-none so the map underneath stays the CTA', () => {
