@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl';
+import maplibregl, { AJAXError, type Map as MapLibreMap } from 'maplibre-gl';
 import type { CityChapter, ReelStateName } from '@/types/reel';
 import { STYLE_URL } from '@/reel/mapStyle';
+import { OSM_RASTER_STYLE } from '@/reel/osmRasterStyle';
 import { FLY_DURATION_MS, FLY_CURVE, easeCamera } from '@/reel/motion';
 
 interface Props {
@@ -9,9 +10,10 @@ interface Props {
   readonly chapterIndex: number;
   readonly stateName: ReelStateName;
   readonly onUserMapInteract?: () => void;
+  readonly onFallbackActivated?: () => void;
 }
 
-export function MapCanvas({ chapters, chapterIndex, stateName, onUserMapInteract }: Props) {
+export function MapCanvas({ chapters, chapterIndex, stateName, onUserMapInteract, onFallbackActivated }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const lastChapterRef = useRef<number>(-1);
@@ -45,6 +47,31 @@ export function MapCanvas({ chapters, chapterIndex, stateName, onUserMapInteract
     // up to the gesture machine via the parent callback.
     map.on('dragstart', () => onUserMapInteract?.());
     map.on('zoomstart', () => onUserMapInteract?.());
+
+    // ERR-03: MapTiler 429 -> swap to OSM raster style + emit fallback signal.
+    // sessionStorage flag prevents re-trigger on subsequent 429s in the same
+    // session (would cause an infinite swap loop if the OSM tiles also 429).
+    // RESEARCH Pattern 6 + Pitfall 6: capture view state BEFORE setStyle({diff:false})
+    // because diff:false is a full re-init that resets center/zoom/bearing/pitch.
+    map.on('error', (e: { error?: unknown }) => {
+      if (!(e.error instanceof AJAXError)) return;
+      if (e.error.status !== 429) return;
+      if (!e.error.url.includes('api.maptiler.com')) return;
+      if (sessionStorage.getItem('map-fallback-active')) return;
+      const view = {
+        center: map.getCenter(),
+        zoom: map.getZoom(),
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      };
+      sessionStorage.setItem('map-fallback-active', '1');
+      // Cast: OSM_RASTER_STYLE is `as const` so its literal-typed `type`
+      // fields ('raster') don't widen to MapLibre's broader StyleSpecification
+      // union without an assertion.
+      map.setStyle(OSM_RASTER_STYLE as unknown as Parameters<typeof map.setStyle>[0], { diff: false });
+      map.once('styledata', () => map.jumpTo(view));
+      onFallbackActivated?.();
+    });
 
     return () => {
       map.remove();

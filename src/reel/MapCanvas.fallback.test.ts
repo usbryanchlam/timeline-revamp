@@ -75,10 +75,13 @@ vi.mock('maplibre-gl', () => {
 // Import AFTER the mock so MapCanvas binds to the fake maplibregl namespace.
 import { MapCanvas } from './MapCanvas';
 
+// Use a loose cast: the test only exercises the init effect's error path,
+// not chapter content. CityChapter requires fields we don't care about here.
 const chapters = [
   {
     id: 'a',
     name: 'A',
+    caption: '',
     center: [0, 0] as [number, number],
     zoom: 12,
     pitch: 0,
@@ -87,7 +90,7 @@ const chapters = [
     arrivedAt: '',
     photos: [],
   },
-];
+] as never;
 
 describe('MapCanvas — ERR-03 MapTiler 429 fallback', () => {
   beforeEach(() => {
