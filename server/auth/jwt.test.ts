@@ -39,8 +39,12 @@ beforeAll(async () => {
   __setJwksGetterForTest(localGetter as never);
 });
 
-async function mint(opts: { exp?: number; aud?: string }): Promise<string> {
-  return await new SignJWT({})
+async function mint(opts: {
+  exp?: number;
+  aud?: string;
+  claims?: Record<string, unknown>;
+}): Promise<string> {
+  return await new SignJWT(opts.claims ?? {})
     .setProtectedHeader({ alg: 'RS256', kid: KID, typ: 'JWT' })
     .setIssuer(ISSUER)
     .setAudience(opts.aud ?? AUDIENCE)
@@ -83,5 +87,70 @@ describe('requireJwt (AUTH-02 SC #4)', () => {
     const body = (await res.json()) as { ok: boolean; sub: string };
     expect(body.ok).toBe(true);
     expect(body.sub).toBe('auth0|test-user');
+  });
+
+  it('customClaimEmail — reads namespaced email custom claim', async () => {
+    const token = await mint({
+      claims: { 'https://timeline.bryanlam.dev/email': 'alice@example.com' },
+    });
+    const app = new Hono();
+    app.use('/protected', requireJwt);
+    app.get('/protected', (c) => c.json({ email: c.var.auth0Email }));
+
+    const res = await app.request('/protected', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { email: string };
+    expect(body.email).toBe('alice@example.com');
+  });
+
+  it('customClaimEmail wins over standard email claim when both present', async () => {
+    const token = await mint({
+      claims: {
+        'https://timeline.bryanlam.dev/email': 'alice-custom@example.com',
+        email: 'alice-std@example.com',
+      },
+    });
+    const app = new Hono();
+    app.use('/protected', requireJwt);
+    app.get('/protected', (c) => c.json({ email: c.var.auth0Email }));
+
+    const res = await app.request('/protected', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { email: string };
+    expect(body.email).toBe('alice-custom@example.com');
+  });
+
+  it('fallbackToStandardEmail — uses standard email claim when custom claim absent (back-compat)', async () => {
+    const token = await mint({
+      claims: { email: 'bob@example.com' },
+    });
+    const app = new Hono();
+    app.use('/protected', requireJwt);
+    app.get('/protected', (c) => c.json({ email: c.var.auth0Email }));
+
+    const res = await app.request('/protected', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { email: string };
+    expect(body.email).toBe('bob@example.com');
+  });
+
+  it('no email claims at all — auth0Email falls back to empty string', async () => {
+    const token = await mint({});
+    const app = new Hono();
+    app.use('/protected', requireJwt);
+    app.get('/protected', (c) => c.json({ email: c.var.auth0Email }));
+
+    const res = await app.request('/protected', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { email: string };
+    expect(body.email).toBe('');
   });
 });

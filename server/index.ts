@@ -1,5 +1,6 @@
-import { Hono } from 'hono';
-import { logger } from 'hono/logger';
+import { Hono, type Context } from 'hono';
+import { requestId } from 'hono/request-id';
+import { HTTPException } from 'hono/http-exception';
 import { serve } from '@hono/node-server';
 import { env } from './env.js';
 import { requireJwt } from './auth/jwt.js';
@@ -18,7 +19,24 @@ import './auth/context.js';
 
 export const app = new Hono();
 
-app.use('*', logger());
+// DEPLOY-06: request ID FIRST so the custom logger + app.onError below can
+// include it. hono/request-id reads inbound X-Request-Id or generates via
+// crypto.randomUUID(); echoes on response's X-Request-Id header. Built-in
+// — do not hand-roll (RESEARCH Pattern 4 / Don't Hand-Roll table).
+app.use('*', requestId());
+
+// Custom logger that includes the request id for log-correlation. Replaces
+// the bare hono/logger import — same call site, richer payload. stderr per
+// typescript/coding-style.md no-console-log rule (matches the existing
+// process.stderr.write discipline in server/auth/jwt.ts:70).
+app.use('*', async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  process.stderr.write(
+    `[${c.get('requestId')}] ${c.req.method} ${c.req.path} ${c.res.status} ${ms}ms\n`,
+  );
+});
 
 // PUBLIC — no auth. /health is for direct API probes (deploy
 // healthchecks); /api/health is for the proxied path so the frontend
@@ -69,6 +87,29 @@ app.route('/api/photos', photosRouter);
 // The /api/cities/* middleware above already covers this path with requireJwt +
 // lazyProvisionUser, so no additional app.use() is needed here.
 app.route('/api/cities/:cityId/photos', photosNestedRouter);
+
+// DEPLOY-06: global error handler runs after all routes. HTTPException is
+// intentional (re-emit verbatim via err.getResponse() — preserves status +
+// message). Other Error types are surprise crashes — log stack to stderr
+// with the request id and return sanitized JSON to the client (no path
+// leakage; matches the existing server/auth/jwt.ts:69-71 stderr pattern).
+//
+// RESEARCH Pattern 4 + Pitfall 5: explicit c.json({...}, 4xx) returns from
+// route handlers do NOT pass through here — only thrown exceptions.
+//
+// Exported as a named const so server/index.error.test.ts can import the
+// PRODUCTION handler directly — direct contract test, no paraphrase.
+export const onErrorHandler = (err: Error, c: Context) => {
+  const reqId = c.get('requestId');
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
+  const stack = err.stack ? err.stack : String(err);
+  process.stderr.write(`[${reqId}] ERROR ${stack}\n`);
+  return c.json({ error: 'internal_error', request_id: reqId }, 500);
+};
+
+app.onError(onErrorHandler);
 
 // Serve the Vite SPA bundle from the image-baked dist/. Phase 8 RESEARCH
 // Pattern 1 / Code Example 2: dist/ is COPY'd into the runtime stage by
