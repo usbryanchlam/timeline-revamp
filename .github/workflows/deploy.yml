@@ -64,6 +64,15 @@ jobs:
           bun run typecheck
 
       - name: Test
+        # Stub env vars so server/env.ts Zod parse succeeds at module load.
+        # The unit tests mock the DB and Auth0; these only need to satisfy the
+        # schema's URL/non-empty checks. Do NOT use real secrets here — these
+        # are intentionally fake.
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          AUTH0_DOMAIN: test.example.auth0.com
+          AUTH0_AUDIENCE: https://api.test.example.com
+          NODE_ENV: test
         run: |
           set -euo pipefail
           bun run test
