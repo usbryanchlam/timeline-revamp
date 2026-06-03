@@ -803,7 +803,7 @@ Before the first deploy run:
 2. **OCIR auth token** (OCI Console → Profile → Auth Tokens → Generate token; record once):
    - Paste into GitHub repo secret `OCIR_AUTH_TOKEN`.
    - Set repo variable `OCIR_USER` to `<tenancy-namespace>/<user-email>` form (e.g. `axqv9r2pkn0o/oracleidentitycloudservice/usbryanchlam@gmail.com`).
-   - Set repo variable `OCI_REGION` to your region code (e.g. `iad`).
+   - Set repo variable `OCIR_REGION_CODE` to your OCIR 3-letter region code (e.g. `sjc`, `iad`). This is distinct from `OCI_REGION` (the full region name, e.g. `us-sanjose-1`, used by Terraform).
    - Set repo variable `OCI_NAMESPACE` to your tenancy namespace.
 
 3. **`production` GitHub environment** with required reviewer:
@@ -827,8 +827,8 @@ Before the first deploy run:
 | Variable | Value | Purpose |
 |---|---|---|
 | `OCIR_USER` | `<tenancy-namespace>/<user-email>` (e.g. `axqv9r2pkn0o/oracleidentitycloudservice/usbryanchlam@gmail.com`) | OCIR docker-login username |
-| `OCI_REGION` | e.g. `iad` | First segment of OCIR FQDN (`iad.ocir.io`) |
-| `OCI_NAMESPACE` | OCI tenancy namespace | Path segment in OCIR FQDN (`iad.ocir.io/<namespace>/timeline-revamp`) |
+| `OCIR_REGION_CODE` | OCIR 3-letter region code (e.g. `sjc`, `iad`) | First segment of OCIR FQDN (`sjc.ocir.io`). Distinct from `OCI_REGION` (full region name owned by Terraform). |
+| `OCI_NAMESPACE` | OCI tenancy namespace | Path segment in OCIR FQDN (`sjc.ocir.io/<namespace>/timeline-revamp`) |
 | `VITE_AUTH0_DOMAIN` | Same as VM `.env` | Build-time inline |
 | `VITE_AUTH0_CLIENT_ID` | Same as VM `.env` | Build-time inline |
 | `VITE_AUTH0_AUDIENCE` | Same as VM `.env` | Build-time inline |

@@ -35,7 +35,9 @@ permissions:
   contents: read
 
 env:
-  OCIR_REGISTRY: ${{ vars.OCI_REGION }}.ocir.io
+  # OCIR uses 3-letter region codes (sjc, iad, fra, ...), NOT the full region name.
+  # OCI_REGION is the full name (us-sanjose-1) and is owned by Terraform (see terraform.yml.deferred).
+  OCIR_REGISTRY: ${{ vars.OCIR_REGION_CODE }}.ocir.io
   OCIR_REPO: ${{ vars.OCI_NAMESPACE }}/timeline-revamp
 
 jobs:
