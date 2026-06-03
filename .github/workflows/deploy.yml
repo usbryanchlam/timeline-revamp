@@ -45,6 +45,27 @@ jobs:
     # Skip verify on workflow_dispatch (rollback) — image already verified at original build.
     if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: timeline
+          POSTGRES_PASSWORD: timeline_ci_pw
+          POSTGRES_DB: timeline
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U timeline -d timeline"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Stub Auth0 values: unit tests mock JWKS; these only satisfy server/env.ts Zod parse.
+      AUTH0_DOMAIN: test.example.auth0.com
+      AUTH0_AUDIENCE: https://api.test.example.com
+      # Real Postgres service URL (NOT secrets — local-only CI Postgres).
+      DATABASE_URL: postgres://timeline:timeline_ci_pw@localhost:5432/timeline
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
 
@@ -63,16 +84,15 @@ jobs:
           set -euo pipefail
           bun run typecheck
 
+      - name: Apply DB migrations
+        # Integration tests (publicReel.test.ts, cities.test.ts, photos.test.ts, ...)
+        # require a migrated schema. Without this step they fail on ECONNREFUSED
+        # or schema-missing errors.
+        run: |
+          set -euo pipefail
+          bun run db:migrate
+
       - name: Test
-        # Stub env vars so server/env.ts Zod parse succeeds at module load.
-        # The unit tests mock the DB and Auth0; these only need to satisfy the
-        # schema's URL/non-empty checks. Do NOT use real secrets here — these
-        # are intentionally fake.
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/test
-          AUTH0_DOMAIN: test.example.auth0.com
-          AUTH0_AUDIENCE: https://api.test.example.com
-          NODE_ENV: test
         run: |
           set -euo pipefail
           bun run test
