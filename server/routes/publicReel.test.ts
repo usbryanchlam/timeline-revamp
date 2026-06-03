@@ -8,10 +8,11 @@ import { inArray } from 'drizzle-orm';
 process.env.AUTH0_DOMAIN = 'test.auth0.com';
 process.env.AUTH0_AUDIENCE = 'https://api.test.example';
 
-// Stub OCI env so getPublicUrl returns deterministic URLs. The OCI client
-// is lazy-constructed only on calls that use the SDK (createWritePar,
-// makeThumbAndPut); getPublicUrl is a pure string construction off the
-// env vars, so we don't need __setOciClientForTest here.
+// Stub OCI env so the env validator passes. publicReel.ts calls
+// getOciClient() which (without an override) eagerly constructs the real
+// OCI SDK client via readFileSync(OCI_PRIVATE_KEY_PATH) — that crashes on
+// CI where no PEM file exists. We inject FAKE_OCI below so the SDK is
+// never built; only getPublicUrl() is exercised by this route.
 process.env.OCI_NAMESPACE = 'test-ns';
 process.env.OCI_BUCKET_NAME = 'test-bucket';
 process.env.OCI_REGION = 'us-test-1';
@@ -19,6 +20,21 @@ process.env.OCI_REGION = 'us-test-1';
 const { publicReelRouter } = await import('./publicReel.js');
 const { db } = await import('../db/client.js');
 const { users, cities, photos } = await import('../db/schema.js');
+const { __setOciClientForTest } = await import('../oci/parClient.js');
+
+// FAKE_OCI is the minimum surface publicReel.ts touches: getPublicUrl only.
+// The other methods (createWritePar, makeThumbAndPut, getMasterBuffer) are
+// unreachable from /api/public/u/:handle — they belong to the upload flow.
+const FAKE_OCI = {
+  createWritePar: async ({ objectName }: { objectName: string }) => ({
+    uploadUrl: `https://oci.test/upload/${objectName}`,
+  }),
+  getMasterBuffer: async (_key: string) => Buffer.from([]),
+  makeThumbAndPut: async (_buf: Buffer, _thumbKey: string): Promise<void> => undefined,
+  getPublicUrl: (key: string) =>
+    `https://objectstorage.${process.env.OCI_REGION!}.oraclecloud.com/n/${process.env.OCI_NAMESPACE!}/b/${process.env.OCI_BUCKET_NAME!}/o/${key}`,
+};
+__setOciClientForTest(FAKE_OCI);
 
 const SUB_A = 'auth0|public-test-A';
 const SUB_B = 'auth0|public-test-B';
