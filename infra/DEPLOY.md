@@ -802,7 +802,7 @@ Before the first deploy run:
 
 2. **OCIR auth token** (OCI Console → Profile → Auth Tokens → Generate token; record once):
    - Paste into GitHub repo secret `OCIR_AUTH_TOKEN`.
-   - Set repo variable `OCIR_USER` to `<tenancy-namespace>/<user-email>` form (e.g. `axqv9r2pkn0o/oracleidentitycloudservice/usbryanchlam@gmail.com`).
+   - Set repo variable `OCIR_USER` to `<tenancy-namespace>/<identity-domain-name>/<username>` form (e.g. `axkyqw8tpzg0/Default/usbryanchlam@gmail.com`). Find the domain name in OCI Console → Identity → Domains. Note: pre-2023 tenancies used `oracleidentitycloudservice` as the second segment instead of the domain name.
    - Set repo variable `OCIR_REGION_CODE` to your OCIR 3-letter region code (e.g. `sjc`, `iad`). This is distinct from `OCI_REGION` (the full region name, e.g. `us-sanjose-1`, used by Terraform).
    - Set repo variable `OCI_NAMESPACE` to your tenancy namespace.
 
@@ -826,7 +826,7 @@ Before the first deploy run:
 
 | Variable | Value | Purpose |
 |---|---|---|
-| `OCIR_USER` | `<tenancy-namespace>/<user-email>` (e.g. `axqv9r2pkn0o/oracleidentitycloudservice/usbryanchlam@gmail.com`) | OCIR docker-login username |
+| `OCIR_USER` | `<tenancy-namespace>/<identity-domain-name>/<username>` (e.g. `axkyqw8tpzg0/Default/usbryanchlam@gmail.com`). Pre-2023 tenancies use `oracleidentitycloudservice` as the middle segment. | OCIR docker-login username |
 | `OCIR_REGION_CODE` | OCIR 3-letter region code (e.g. `sjc`, `iad`) | First segment of OCIR FQDN (`sjc.ocir.io`). Distinct from `OCI_REGION` (full region name owned by Terraform). |
 | `OCI_NAMESPACE` | OCI tenancy namespace | Path segment in OCIR FQDN (`sjc.ocir.io/<namespace>/timeline-revamp`) |
 | `VITE_AUTH0_DOMAIN` | Same as VM `.env` | Build-time inline |
