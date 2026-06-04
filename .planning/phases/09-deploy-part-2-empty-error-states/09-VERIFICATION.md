@@ -1,15 +1,26 @@
 ---
 phase: 09-deploy-part-2-empty-error-states
-verified: 2026-06-01T16:25:00Z
-status: human_needed
-score: 4/4 ROADMAP success criteria verified in code; 1 operator-action checklist + 1 live smoke remain
+verified: 2026-06-04T06:38:52Z
+status: verified
+score: 4/4 ROADMAP success criteria verified in code + live v0.1.0 deploy green (GHA run 26935282937)
 overrides_applied: 0
 re_verification:
-  previous_status: none
-  previous_score: n/a
-  gaps_closed: []
+  previous_status: human_needed
+  previous_score: "4/4 ROADMAP success criteria verified in code; 1 operator-action checklist + 1 live smoke remain"
+  gaps_closed:
+    - "bbc4952 — server/env.ts module-load crash on CI: stubbed DATABASE_URL/AUTH0_DOMAIN/AUTH0_AUDIENCE in workflow Test step"
+    - "d5d1fbe — integration tests ECONNREFUSED localhost:5432: provisioned postgres:16 service container + db:migrate step in workflow"
+    - "a950875 — publicReel.test.ts readFileSync(undefined): injected FAKE_OCI via __setOciClientForTest before route import"
+    - "0b64dc1 — OCIR 401 Unauthorized: corrected OCIR_USER from legacy oracleidentitycloudservice form to identity-domain form (axkyqw8tpzg0/Default/<username>)"
   gaps_remaining: []
   regressions: []
+  human_verification_completed:
+    - "End-to-end tag-driven deploy (SC1 live) — v0.1.0 pushed 2026-06-04; verify+build+push+approve+SSH+migrate+up+curl all green; /api/health returned {\"status\":\"ok\",\"db\":\"ok\"} on first try"
+    - "Auth0 Action attached + populated email claim (F9 live) — inject-email-into-access-token deployed + attached to Login flow; gated by client_id to avoid leaking into mykb tokens"
+    - "One-off SQL backfill (F9) — users.email populated for bryan row via docker compose exec postgres psql; row Google-federation pre-existing populated value confirmed correct"
+  human_verification_deferred:
+    - "F1.1 cloud-init verification on fresh VM rebuild (terraform taint) — deferred to next genuine rebuild event"
+    - "ERR-01 retry tile + ERR-03 MapTiler fallback visual UAT — deferred to post-launch QA pass"
 human_verification:
   - test: "End-to-end tag-driven deploy (SC1 live)"
     expected: "Push v0.1.0 → GHA verify+build+push succeeds, production env reviewer approves, SSH-in migrate+up runs cleanly, curl --retry 5 https://timeline.bryanlam.dev/api/health returns 200"
@@ -185,5 +196,35 @@ None of these are code defects; they are the documented operator-action handoff 
 
 ---
 
-_Verified: 2026-06-01T16:25:00Z_
-_Verifier: Claude (gsd-verifier, Opus 4.7 1M)_
+## Post-Merge CI Gaps Closed (2026-06-04)
+
+After the initial verifier signed off on 2026-06-01 with status `human_needed`, the operator-side execution of the punchlist exercised the pipeline end-to-end for the first time and surfaced four real CI gaps the verifier had missed. Each was a "passes locally, fails on a fresh runner" hazard masked by the operator's populated `.env.local`, running local docker-compose Postgres, and existing OCI PEM file. All four were fixed inside Phase 9's commit window (none escaped to Phase 10).
+
+| # | Fix commit | Symptom in CI | Root cause | Why the verifier missed it |
+|---|---|---|---|---|
+| 1 | `bbc4952` — fix(09-01): stub env vars in CI Test step | `server/env.ts:39 process.exit(1)` at module load: missing `DATABASE_URL`, `AUTH0_DOMAIN`, `AUTH0_AUDIENCE` | `server/env.ts` Zod-validates `process.env` synchronously at import time and `process.exit(1)`s on failure. A fresh CI runner has no `.env*` file so all required keys are missing | Local `bun run test` works because dotenv loads `.env.local` at `server/env.ts:7`. The verifier ran tests in a populated local environment and never simulated "no .env files" |
+| 2 | `d5d1fbe` — fix(09-01): provision Postgres service + run migrations | `ECONNREFUSED 127.0.0.1:5432` from integration tests (`publicReel.test.ts`, `cities.test.ts`, `photos.test.ts`, ...) | ~5 test files (flagged in 09-02 SUMMARY as "DATABASE_URL-dependent, out of plan scope") talk to a real Postgres via Drizzle; CI runner has no DB service | 09-02 SUMMARY's flag of "DATABASE_URL-dependent" was noted but not connected to "must provision a Postgres service container in the GHA workflow." The verifier saw 405/405 pass locally — local docker-compose Postgres was load-bearing |
+| 3 | `a950875` — fix(09-01): inject FAKE_OCI in publicReel.test.ts | `TypeError: readFileSync(undefined)` at `parClient.ts:66` — eager OCI SDK construction crashes when `OCI_PRIVATE_KEY_PATH` is unset | `publicReel.test.ts` had a comment claiming `getPublicUrl` is a "pure string construction so we don't need `__setOciClientForTest`" — but `publicReel.ts:105` calls `getOciClient()` first, which lazy-builds the real OCI SDK and reads the PEM file. Local PEM exists; CI doesn't | Pre-existing test-bug from Phase 7 (publicReel was added there) masked by the operator's local OCI PEM. The verifier read the test's comment and trusted it. The right diff catch: grep for `getOciClient()` calls and confirm every test path mocks via `__setOciClientForTest` |
+| 4 | `0b64dc1` — docs(09-01): OCIR_USER identity-domain form | `Get https://sjc.ocir.io/v2/: unknown: Unauthorized` after fresh-token + format-correction loop | Plan inherited the legacy `<namespace>/oracleidentitycloudservice/<email>` form from older OCI docs. The operator's tenancy uses modern Identity Domains (`<namespace>/Default/<username>`). 401 until the docker login username matched the actual domain name | Plan's `user_setup` hint copied a Phase 8.1 example value without operator-verification. The verifier cannot directly verify external OCI configuration, but it could have flagged "OCIR_USER format is tenancy-era-dependent — confirm with operator" rather than treating the example as literal truth |
+
+### Pipeline state after fixes
+
+- **verify** — green (Postgres 16 service container, db:migrate, 405/405 tests pass in CI)
+- **build-and-push** — green (QEMU arm64 buildx + OCIR push at `sjc.ocir.io/axkyqw8tpzg0/timeline-revamp:{v0.1.0,latest,main-<sha>}`)
+- **deploy** — green for tag `v0.1.0` on 2026-06-04 (production env reviewer approved; SSH-in, migrations applied, `docker compose up -d` was a no-op because `v0.1.0` and `latest` share an image SHA, curl `/api/health` → `{"status":"ok","db":"ok"}` first try)
+
+### Lessons for the Phase 10 verifier
+
+1. **Simulate the empty CI environment.** If `bun run test` requires anything beyond the source tree + lockfile, it must be stubbed/provisioned in the workflow OR the test must fail loudly with a "DB required" gate.
+2. **Audit test files for "lazy SDK construction" landmines.** Any test that imports a route which calls `getXClient()` must inject a mock via the `__setXClientForTest` seam — comments claiming "we don't need it" are routinely wrong because the seam exists precisely for the case the comment dismisses.
+3. **External-tenancy strings are not facts.** OCI/Auth0/etc. identifiers in plan `user_setup` blocks must carry a "find this in your dashboard, do not copy" disclaimer rather than a literal example value. The plan-checker should flag any operator-facing identifier whose value was inherited rather than verified.
+
+### Final status
+
+Phase 9 is **fully verified end-to-end including live deploy**. Frontmatter status upgraded from `human_needed` → `verified`. The 5 originally-deferred `human_verification` items break down as: 3 satisfied by operator action (live deploy SC1, Auth0 attach, SQL backfill), 2 deferred (F1.1 cloud-init rebuild verification, ERR-01/ERR-03 visual UAT) — both deferrals are documented in frontmatter under `human_verification_deferred`.
+
+---
+
+_Originally verified: 2026-06-01T16:25:00Z_
+_Re-verified (post-merge CI + live deploy): 2026-06-04T06:38:52Z_
+_Verifier: Claude (gsd-verifier, Opus 4.7 1M) + orchestrator (post-merge gap closure)_
