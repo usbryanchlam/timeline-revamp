@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
 status: complete
-stopped_at: Phase 9 verified (human_needed — operator setup pending)
-last_updated: "2026-06-01T22:30:00.000Z"
-last_activity: 2026-06-01 -- Phase 09 verified
+stopped_at: Phase 9 fully verified (live v0.1.0 deploy green; 4 CI gaps closed); holding before Phase 10
+last_updated: "2026-06-05T00:00:00.000Z"
+last_activity: 2026-06-05 -- Phase 09 live-deploy verified; iPhone UAT pending; Phase 10 (MP4) on hold
 progress:
   total_phases: 13
   completed_phases: 8
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 09 complete (verified — operator setup pending). Next: Phase 10 (Redis + BullMQ + MP4 render pipeline; ERR-02 lands here).
+**Current focus:** Phase 09 complete + live-verified (v0.1.0 deployed 2026-06-04, all operator-setup items closed). Next session: iPhone UAT review + outstanding-items triage. Phase 10 (MP4) is **on hold** — user choice; no current calendar pressure.
 
 ## Current Position
 
-Phase: 09 (deploy-part-2-empty-error-states) — VERIFIED (`human_needed`)
-Plan: 3 of 3 complete
-Status: Phase 09 implementation shipped; awaiting operator setup punchlist (GH secrets+vars+production env, Auth0 Action attach, first tag push, optional F1.1 rebuild verify)
-Last activity: 2026-06-01 -- Phase 09 verified
+Phase: 09 (deploy-part-2-empty-error-states) — VERIFIED (live)
+Plan: 3 of 3 complete; SUMMARY + VERIFICATION committed
+Status: Phase 09 shipped end-to-end. v0.1.0 tag triggered GHA → arm64 OCIR push → SSH-deploy → migrate → curl /api/health 200 (GHA run 26935282937). 4 CI gaps closed post-merge (env stubs, postgres service, FAKE_OCI in publicReel.test, OCIR_USER identity-domain form). Auth0 Action attached + gated by client_id. SQL backfill confirmed. Holding before next phase pending iPhone UAT.
+Last activity: 2026-06-05 -- iPhone UAT pending; Phase 10 (MP4) on hold per user
 
 Progress: [████████░░░░] 67% (8 of 12 phases complete)
 
