@@ -88,7 +88,7 @@ export function ReducedMotionReel({
 
       <footer className="px-5 pb-16 max-w-screen-sm mx-auto">
         <a
-          href="/signup"
+          href="/app?signup=1"
           className="block w-full rounded-full bg-amber-400 text-bg font-semibold text-center py-3 text-base"
         >
           Make your own →

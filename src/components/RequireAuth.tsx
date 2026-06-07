@@ -22,8 +22,16 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
+      // ?signup=1 on the entry URL routes the user to Auth0's signup tab
+      // instead of the login tab. Used by the "Make your own" CTA on the
+      // public reel surface — that link can't call loginWithRedirect itself
+      // because Auth0Provider is scoped to /app/* (AUTH-04 architectural
+      // seam, src/auth/AuthProvider.tsx), so it just navigates here and we
+      // forward the hint.
+      const isSignup = new URLSearchParams(window.location.search).has('signup');
       void loginWithRedirect({
-        appState: { returnTo: window.location.pathname + window.location.search },
+        appState: { returnTo: window.location.pathname },
+        authorizationParams: isSignup ? { screen_hint: 'signup' } : undefined,
       });
     }
   }, [isLoading, isAuthenticated, loginWithRedirect]);

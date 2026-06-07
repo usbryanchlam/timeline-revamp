@@ -10,7 +10,7 @@ export function CTAPill() {
         Timeline — your travels, as a movie.
       </p>
       <a
-        href="/signup"
+        href="/app?signup=1"
         className="glass-pill pointer-events-auto rounded-full px-4 py-2 text-sm font-semibold text-ink hover:bg-bg-elev/90 transition-colors duration-200"
       >
         Make your own
