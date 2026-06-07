@@ -285,8 +285,13 @@ export function useGestureMachine({
   }, [dispatch]);
 
   // --- State-driven side-effect timers -------------------------------------
+  // CHAPTER_SWIPE: fire CHAPTER_FLY_DONE after the camera animation duration.
+  // Deps intentionally exclude pointerCount — a finger touching the screen
+  // mid-flight must NOT restart the timer, else the flight feels "hung"
+  // when the user impatiently swipes again before landing. chapterIndex
+  // IS a dep so back-to-back JUMP_CHAPTER events (already in CHAPTER_SWIPE,
+  // retargeting) restart the fly-done countdown for the new destination.
   useEffect(() => {
-    // CHAPTER_SWIPE: fire CHAPTER_FLY_DONE after the camera animation duration.
     if (state.name === 'CHAPTER_SWIPE') {
       clear(flyDoneTimerRef);
       flyDoneTimerRef.current = window.setTimeout(() => {
@@ -295,8 +300,12 @@ export function useGestureMachine({
     } else {
       clear(flyDoneTimerRef);
     }
+  }, [state.name, state.chapterIndex, dispatch]);
 
-    // MAP_INTERACT with all fingers up: 3s idle to return to IDLE.
+  // MAP_INTERACT with all fingers up: 3s idle to return to IDLE. This one
+  // DOES depend on pointerCount — the transition from "still touching" to
+  // "all fingers up" is what starts the idle countdown.
+  useEffect(() => {
     if (state.name === 'MAP_INTERACT' && state.pointerCount === 0) {
       clear(mapIdleTimerRef);
       mapIdleTimerRef.current = window.setTimeout(() => {
@@ -305,10 +314,6 @@ export function useGestureMachine({
     } else {
       clear(mapIdleTimerRef);
     }
-
-    return () => {
-      // Don't clear here — we want the timer to outlive the render.
-    };
   }, [state.name, state.pointerCount, dispatch]);
 
   // --- Auto-play tick (only in IDLE) ---------------------------------------

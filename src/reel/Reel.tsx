@@ -6,6 +6,7 @@ import { MapPoster } from './MapPoster';
 import { ChapterOverlay } from './ChapterOverlay';
 import { ChapterRail } from './ChapterRail';
 import { CTAPill } from './CTAPill';
+import { PlayPauseIndicator } from './PlayPauseIndicator';
 import { StateBadge } from './StateBadge';
 
 // Defer MapLibre + MapCanvas to a separate chunk so the LCP poster paints first.
@@ -98,6 +99,7 @@ export function Reel({ chapters = SEEDED_CITIES }: ReelProps = {}) {
         scrubT={state.scrubT}
       />
       <CTAPill />
+      <PlayPauseIndicator state={state.name} />
       <StateBadge state={state.name} />
 
       {/* Screen-reader announcement on chapter change */}

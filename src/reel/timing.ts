@@ -2,8 +2,11 @@
 // useGestureMachine cannot drift apart silently — they coordinate by reading
 // the same number.
 
-/** ms a chapter dwells in IDLE auto-play before the camera flies away. */
-export const AUTOPLAY_DWELL_MS = 4500 as const;
+/** ms a chapter dwells in IDLE auto-play before the camera flies to the next
+ *  chapter. This is post-landing time only — IDLE is entered *after*
+ *  CHAPTER_FLY_DONE fires, so total per-chapter cycle is
+ *  FLY_DURATION_MS + AUTOPLAY_DWELL_MS. Currently in UAT tuning. */
+export const AUTOPLAY_DWELL_MS = 8000 as const;
 
 /** Photo crossfade duration inside a chapter. */
 export const CROSSFADE_MS = 200 as const;

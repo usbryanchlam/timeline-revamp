@@ -7,11 +7,14 @@ export interface PhotoSeed {
   readonly alt: string;
 }
 
-/** Real user photo from /api/cities/:id/photos (Phase 6). */
+/** Real photo at a URL. Two sources today:
+ *  - /app/ reel: PhotoCard[] from /api/cities/:id/photos (Phase 6) — OCI public URLs (DATA-07).
+ *  - Public seeded reel: PhotoCard[] from src/data/seeded-cities.ts — local /seed-photos/... files.
+ *  Both render through PhotoCycle (crossfade cycling). */
 export interface PhotoCard {
   readonly id: string;
-  readonly masterUrl: string;     // OCI public URL (DATA-07)
-  readonly thumbUrl: string;      // OCI public URL — placeholder while master loads
+  readonly masterUrl: string;     // OCI public URL or local /seed-photos/... path
+  readonly thumbUrl: string;      // Same family as masterUrl; placeholder while master loads
   readonly alt: string;           // empty string '' when no caption (A11Y-05)
   readonly orderIndex: number;
 }

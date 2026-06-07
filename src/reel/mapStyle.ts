@@ -8,7 +8,7 @@
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
 
 export const STYLE_URL: string = MAPTILER_KEY
-  ? `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`
+  ? `https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_KEY}`
   : 'https://demotiles.maplibre.org/style.json';
 
 if (!MAPTILER_KEY && typeof window !== 'undefined') {

@@ -463,7 +463,7 @@ describe('POINTER_UP — flick path', () => {
     expect(next.chapterIndex).toBe(2);
   });
 
-  it('CHAPTER_SWIPE flick: not eligible for promotion, falls through default', () => {
+  it('CHAPTER_SWIPE mid-flight up-flick: retargets to chapterIndex+1', () => {
     const s = withState({
       name: 'CHAPTER_SWIPE',
       pointerCount: 1,
@@ -477,7 +477,46 @@ describe('POINTER_UP — flick path', () => {
       TOTAL,
     );
     expect(next.name).toBe('CHAPTER_SWIPE');
-    expect(next.chapterIndex).toBe(3);
+    expect(next.chapterIndex).toBe(4);
+    // gesture deltas reset so the next flick measurement starts clean
+    expect(next.gestureDy).toBe(0);
+    expect(next.gestureStartedAt).toBeNull();
+  });
+
+  it('CHAPTER_SWIPE mid-flight down-flick: retargets to chapterIndex-1 (cancels back)', () => {
+    const s = withState({
+      name: 'CHAPTER_SWIPE',
+      pointerCount: 1,
+      chapterIndex: 3,
+      gestureDy: 50,
+      gestureStartedAt: 1000,
+    });
+    const next = transition(
+      s,
+      { type: 'POINTER_UP', pointers: 1, t: 1100 },
+      TOTAL,
+    );
+    expect(next.name).toBe('CHAPTER_SWIPE');
+    expect(next.chapterIndex).toBe(2);
+  });
+
+  it('CHAPTER_SWIPE up-flick at last chapter: clamps, chapterIndex unchanged', () => {
+    const s = withState({
+      name: 'CHAPTER_SWIPE',
+      pointerCount: 1,
+      chapterIndex: TOTAL - 1,
+      gestureDy: -50,
+      gestureStartedAt: 1000,
+    });
+    const next = transition(
+      s,
+      { type: 'POINTER_UP', pointers: 1, t: 1100 },
+      TOTAL,
+    );
+    // Stays CHAPTER_SWIPE but chapterIndex doesn't advance — useEffect
+    // watching chapterIndex won't restart the fly-done timer.
+    expect(next.name).toBe('CHAPTER_SWIPE');
+    expect(next.chapterIndex).toBe(TOTAL - 1);
   });
 
   it('MAP_INTERACT 1→0 fingers with flick deltas: stays MAP_INTERACT (not eligible for flick)', () => {

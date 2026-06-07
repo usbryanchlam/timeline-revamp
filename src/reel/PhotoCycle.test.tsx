@@ -63,9 +63,11 @@ describe('PhotoCycle', () => {
     vi.useFakeTimers();
     mockUsePrefersReducedMotion.mockReturnValue(false);
     const photos = [makeCard('a'), makeCard('b'), makeCard('c')];
-    render(<PhotoCycle photos={photos} />);
+    // Pin dwell at 4500 explicitly so the test is hermetic against
+    // AUTOPLAY_DWELL_MS tuning.
+    render(<PhotoCycle photos={photos} dwellMs={4500} />);
     expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/a');
-    // At 4500ms dwell ÷ 3 photos = 1500ms per photo.
+    // 4500ms dwell ÷ 3 photos = 1500ms per photo.
     act(() => {
       vi.advanceTimersByTime(1500);
     });
@@ -80,7 +82,7 @@ describe('PhotoCycle', () => {
     vi.useFakeTimers();
     mockUsePrefersReducedMotion.mockReturnValue(false);
     const photos = [makeCard('a'), makeCard('b')];
-    render(<PhotoCycle photos={photos} />);
+    render(<PhotoCycle photos={photos} dwellMs={4500} />);
     act(() => {
       vi.advanceTimersByTime(2250);
     });
@@ -91,7 +93,7 @@ describe('PhotoCycle', () => {
     vi.useFakeTimers();
     mockUsePrefersReducedMotion.mockReturnValue(false);
     const photos = Array.from({ length: 10 }, (_, i) => makeCard(`p${i}`));
-    render(<PhotoCycle photos={photos} />);
+    render(<PhotoCycle photos={photos} dwellMs={4500} />);
     expect(screen.getByRole('img').getAttribute('src')).toContain('thumb/p0');
     // 4500 / 10 = 450ms, but the floor is 800ms — verify by advancing
     // just under the floor and confirming NO advance, then past the floor.

@@ -14,10 +14,12 @@
 // Values track DESIGN.md "Motion" section. Update both DESIGN.md and this
 // file when tuning; the runtime is downstream of the design contract.
 
-// DESIGN --motion-cinematic. Locked. Map flyTo between chapters runs this
-// long; the gesture state machine's CHAPTER_FLY_DONE fires after the same
-// elapsed time.
-export const FLY_DURATION_MS = 2400 as const;
+// DESIGN --motion-cinematic. Map flyTo between chapters runs this long; the
+// gesture state machine's CHAPTER_FLY_DONE fires after the same elapsed
+// time. Currently in UAT tuning — bumped from the W1 value of 2400 to give
+// each transition the "taking flight" feel; AUTOPLAY_DWELL_MS in timing.ts
+// must stay >= this so a chapter isn't half-flown when autoplay advances.
+export const FLY_DURATION_MS = 8000 as const;
 
 // MapLibre `curve` parameter — controls the zoom-out arc during transit
 // (how high the camera rises before descending into the target). NOT

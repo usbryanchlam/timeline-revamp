@@ -56,7 +56,7 @@ export const FLICK_MAX_DURATION_MS = 300 as const;
 export const TAP_MAX_DURATION_MS = 200 as const;
 export const TAP_MAX_TRAVEL_PX = 10 as const;
 export const LONG_PRESS_MS = 200 as const;
-export const MAP_INTERACT_IDLE_MS = 3000 as const;
+export const MAP_INTERACT_IDLE_MS = 1000 as const;
 export const ORIENTATION_SETTLE_MS = 300 as const;
 // Re-export the canonical camera flight duration. The single source of
 // truth lives in src/reel/motion.ts so the gesture state machine's
@@ -218,10 +218,17 @@ export function transition(
         duration < FLICK_MAX_DURATION_MS;
       const wasSingleFinger = state.pointerCount === 1 && remaining === 0;
 
+      // Flicks are accepted from IDLE / PAUSED (start a fresh flight) and
+      // also from CHAPTER_SWIPE (retarget mid-flight to the next/prev chapter).
+      // Mid-flight retarget feels TikTok-like: the camera abandons the current
+      // target and flies to the new one. MapLibre's flyTo is interruptible, so
+      // calling it again smoothly redirects.
       if (
         wasSingleFinger &&
         isFlick &&
-        (state.name === 'IDLE' || state.name === 'PAUSED')
+        (state.name === 'IDLE' ||
+          state.name === 'PAUSED' ||
+          state.name === 'CHAPTER_SWIPE')
       ) {
         const direction = state.gestureDy < 0 ? 1 : -1; // up = next, down = prev
         const next = clampChapter(state.chapterIndex + direction, totalChapters);
