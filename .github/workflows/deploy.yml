@@ -166,6 +166,25 @@ jobs:
       group: deploy-prod
       cancel-in-progress: false     # Never cancel mid-deploy — queued deploys WAIT
     steps:
+      - uses: actions/checkout@v4
+        # Need the compose files on the runner so we can scp them. The VM's
+        # /opt/timeline-revamp/ is NOT a git checkout, so without an explicit
+        # sync step the compose files drift over time as we edit them in the
+        # repo. Discovered during v0.2.0: the VM had a pre-Phase-9 prod compose
+        # file with build: instead of image:, so `compose pull api` silently
+        # skipped and `up -d` did nothing — every deploy was a no-op.
+
+      - name: Sync compose files to VM
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ubuntu
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          source: "docker-compose.yml,docker-compose.prod.yml"
+          target: "/opt/timeline-revamp/"
+          overwrite: true
+
       - name: Deploy to OCI VM
         uses: appleboy/ssh-action@v1
         env:
