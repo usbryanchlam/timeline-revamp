@@ -72,16 +72,17 @@ describe('TripsRoute — /app/trips 0-city empty-state polish', () => {
     expect(screen.queryByText(/tap the map to add your first stop\./i)).toBeNull();
   });
 
-  it('empty card has pointer-events-none so the map underneath stays the CTA', () => {
+  it('empty card lives in the list area, not overlaid on the map', () => {
     mockCities = [];
     const { container } = render(
       React.createElement(MemoryRouter, null,
         React.createElement(TripsRoute, null),
       ),
     );
-    // The card is the only element with the empty-state copy.
+    // The card sits below the map (in the scrollable list area) so it never
+    // blocks map interactions. Verify it's NOT absolute-positioned.
     const card = screen.getByText(/tap the map to add your first stop\./i).closest('div');
-    expect(card?.className).toContain('pointer-events-none');
+    expect(card?.className).not.toContain('absolute');
     // And the GLASS-PILL class is gone.
     expect(container.querySelector('.glass-pill')).toBeNull();
   });

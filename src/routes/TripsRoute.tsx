@@ -122,14 +122,6 @@ export function TripsRoute() {
             onPick={handlePick}
             onCityClick={handleCityClick}
           />
-          {empty && (
-            <div
-              className="absolute inset-x-0 bottom-6 mx-auto w-max max-w-[90%] bg-bg-elev border border-line rounded-2xl px-5 py-4 text-center shadow-xl pointer-events-none"
-            >
-              <p className="text-ink mb-1">Tap the map to add your first stop.</p>
-              <span aria-hidden="true" className="inline-block text-amber-500 text-xl">↑</span>
-            </div>
-          )}
         </div>
       ) : (
         // Placeholder reserves the map area while cities load — prevents
@@ -179,6 +171,16 @@ export function TripsRoute() {
             onReorder={handleReorder}
             onPhotosClick={(id) => setSelectedCityId(id)}
           />
+        )}
+
+        {!isLoading && !error && empty && (
+          // Empty-state hint. Lives in the list area (NOT overlaid on the
+          // map) so it never blocks map content. Arrow on top points up
+          // at the map above.
+          <div className="mx-auto w-max max-w-[90%] mt-2 bg-bg-elev border border-line rounded-2xl px-5 py-4 text-center">
+            <span aria-hidden="true" className="block text-amber-500 text-xl mb-1">↑</span>
+            <p className="text-ink">Tap the map to add your first stop.</p>
+          </div>
         )}
       </div>
 
