@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
 status: complete
-stopped_at: Phase 9 fully verified (live v0.1.0 deploy green; 4 CI gaps closed); holding before Phase 10
-last_updated: "2026-06-05T00:00:00.000Z"
-last_activity: 2026-06-05 -- Phase 09 live-deploy verified; iPhone UAT pending; Phase 10 (MP4) on hold
+stopped_at: iPhone UAT round closed at v0.2.4 (5 patch releases); Phase 10 (MP4) remains on hold; next is Phase 11 mobile polish + a11y branch
+last_updated: "2026-06-19T00:00:00.000Z"
+last_activity: 2026-06-19 -- v0.2.4 live; UAT round closed; Phase 11 mobile polish + a11y next
 progress:
   total_phases: 13
   completed_phases: 8
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 09 complete + live-verified (v0.1.0 deployed 2026-06-04, all operator-setup items closed). Next session: iPhone UAT review + outstanding-items triage. Phase 10 (MP4) is **on hold** — user choice; no current calendar pressure.
+**Current focus:** Phase 09 complete + live-verified; iPhone UAT round closed at v0.2.4 (5 patch releases on top of v0.1.0). Next: Phase 11 mobile polish + a11y audit branch (Phase 10 MP4 remains on hold per user).
 
 ## Current Position
 
-Phase: 09 (deploy-part-2-empty-error-states) — VERIFIED (live)
-Plan: 3 of 3 complete; SUMMARY + VERIFICATION committed
-Status: Phase 09 shipped end-to-end. v0.1.0 tag triggered GHA → arm64 OCIR push → SSH-deploy → migrate → curl /api/health 200 (GHA run 26935282937). 4 CI gaps closed post-merge (env stubs, postgres service, FAKE_OCI in publicReel.test, OCIR_USER identity-domain form). Auth0 Action attached + gated by client_id. SQL backfill confirmed. Holding before next phase pending iPhone UAT.
-Last activity: 2026-06-05 -- iPhone UAT pending; Phase 10 (MP4) on hold per user
+Phase: 09 (deploy-part-2-empty-error-states) — VERIFIED (live, v0.2.4)
+Plan: 3 of 3 complete; SUMMARY + VERIFICATION committed; 5 UAT patches landed post-Phase-9 closure (v0.2.0–v0.2.4)
+Status: Phase 09 shipped end-to-end (v0.1.0 → GHA verify+build+SSH deploy+health-check live 2026-06-04). iPhone UAT round 2026-06-06 → 2026-06-19 produced 5 patch releases (see UAT Round table below). Phase 10 (MP4) remains on hold; next is Phase 11 mobile polish + a11y audit branch.
+Last activity: 2026-06-19 -- v0.2.4 live on Node-24 actions; UAT round closed; Phase 11 next
 
 Progress: [████████░░░░] 67% (8 of 12 phases complete)
 
@@ -52,6 +52,18 @@ Progress: [████████░░░░] 67% (8 of 12 phases complete)
 | 5 (Cities CRUD + reorder + reel API) | 3 | ~8h | ~2h40 | `superpowers:subagent-driven-development` workflow: fresh implementer subagent per task with two-stage review (spec compliance → code quality) + fix subagent per Important issue. 52 new tests (88 → 140). 8+ review-fix commits caught real bugs pre-merge (Drizzle wrapping, StrictMode mountedRef, concurrent drag race, focus rings, tz drift). 1 mid-Task-2 stream timeout recovered cleanly via fresh-agent resume. DEFERRABLE constraint exercised end-to-end for the first time via two-row swap test |
 | 6 (Photo upload pipeline + REEL-09) | 4 | ~5h | ~1h15 | First use of `superpowers:dispatching-parallel-agents` skill — Wave 1 (06-01 client pipeline + 06-02 server PAR/sharp) ran fully in parallel via disjoint file trees (atomic dep pre-install at 27fdab7 avoided bun.lock race). 95 new tests (140 → 235: 19 client pipeline, 19 server endpoints + MIME sniff, 36 UI components, 21 reel cycling). Plan-checker round 2 REVISE caught 4 blockers pre-execution (silently-dropped locked decisions: full-screen viewer + per-photo delete UI; server MIME byte-sniff missing; 06-04 cross-plan dep). 06-02 agent stream watchdog killed it after work completed but before turn close — atomic-per-task commits made disk verification + recovery trivial. Real OCI bucket provisioning (CORS via S3-compat API only — Native API silent-drop landmine documented in memory). |
 | 7 (Public URLs + handle reservation) | 3 | ~3h | ~1h | 113 new tests (235 → 348: 30 plan 07-01 + 58 plan 07-02 + 0 plan 07-03 config-as-code + 1 UAT-fix regression). TWO mid-plan stream-idle timeouts (~20min each, on 07-01 + 07-02 executor agents) — recovered cleanly via inline completion against atomic-per-task disk state. Stream-timeout pattern now load-bearing: 4 occurrences across phases 5/6/7. Three deviations auto-fixed pre-merge (inverted jsdom polyfill guard; arrow-fn-as-constructor for maplibre mock; comment-text-vs-grep-guard friction for `mountedRef`/`easeTo`/`listen 443` literals — second time this hazard surfaced in one phase). Live UAT caught a Chromium close-watcher anti-modal-trap: double-Esc dismissed the HandlePickerModal even with cancel-preventDefault — fixed with document-level keydown capture-phase listener. 3 mobile UAT items deferred to post-Phase-8 deployment QA (iPhone 60FPS orbit sustain, iOS globe projection rendering, mixed-case URL resolution on the deployed stack). |
+
+**iPhone UAT Round (2026-06-06 → 2026-06-19, 5 patch releases on top of v0.1.0):**
+
+| Tag | Summary | Notable findings |
+|---|---|---|
+| v0.2.0 | 9-city HK→SF itinerary + 9 vertical CC0 Unsplash photos + FLY_DURATION_MS 2400→8000 + AUTOPLAY_DWELL_MS 4500→8000 + MAP_INTERACT_IDLE_MS 3000→1000 + hybrid map style + mid-flight swipe retarget + PlayPauseIndicator (transient center toggle + persistent paused glyph) | useGestureMachine timer effect had `pointerCount` as a dep, so mid-flight pointer activity re-scheduled the fly-done timer → "hung" flight. Split into two effects: fly-done watches `state.name`+`chapterIndex`, idle-timer watches `pointerCount`. State machine flick-eligibility relaxed from IDLE/PAUSED to also include CHAPTER_SWIPE for mid-flight retarget. |
+| v0.2.1 | Deploy workflow scp's compose files to VM before docker commands (`actions/checkout@v4` + `appleboy/scp-action@v1`). | Discovered the v0.1.0 + v0.2.0 deploys were silent no-ops: VM's `/opt/timeline-revamp/docker-compose.prod.yml` was the pre-Phase-9 `build:`-based version, not the `image:`-based override. `docker compose pull api` Skipped, `up -d` had nothing to recreate; api container had been running the original manually-built local image the whole time. |
+| v0.2.2 | "Make your own" CTA wired to `/app?signup=1` instead of 404 stub; RequireAuth forwards `screen_hint: 'signup'` to Auth0. | CTA on public reel couldn't call `loginWithRedirect` directly because Auth0Provider is scoped to `/app/*` (AUTH-04 seam). Query-param signal threaded through the seam without breaking it. |
+| v0.2.3 | TripsRoute empty-state hint moved below the map (was overlaid on bottom of map blocking content) + production-side `chmod 711 /opt/timeline-revamp/.oci/` to unblock photo uploads. | OCI PEM private key file inside `.oci/` was chowned to uid 1001 (container's `app` user) but the parent directory was mode 700 owned by uid 1000 (ubuntu) — container couldn't traverse the dir to open the file. `EACCES` 500'd both GET photos and POST upload-url. Fixed perms on VM; no code change needed (`realClient ??= buildRealClient()` retries cleanly on next request). |
+| v0.2.4 | GHA actions bumped to Node 24 majors: `actions/checkout@v4→v5`, `docker/setup-qemu-action@v3→v4`, `docker/setup-buildx-action@v3→v4`, `docker/login-action@v3→v4`, `docker/build-push-action@v6→v7`. | GitHub forced Node 24 as runner default on 2026-06-16; existing pins emitted deprecation warnings until majors bumped. `oven-sh/setup-bun@v2`, `appleboy/ssh-action@v1`, `appleboy/scp-action@v1` not flagged. |
+
+UAT round mechanics: established `npm version <bump> -m "chore: release v%s" && git push --follow-tags` as the single-command release flow (catches the "tagged but forgot to bump package.json.version" mistake the workflow's verify-tag-matches-pkg guard exists to enforce).
 
 **Recent Trend:**
 
@@ -176,16 +188,17 @@ Items acknowledged and carried forward:
 
 ## Session Continuity
 
-Last session: 2026-06-01T21:02:45.869Z
-Stopped at: Phase 9 context gathered
+Last session: 2026-06-19 (UAT round closure + Node 24 actions bump)
+Stopped at: v0.2.4 live; UAT round closed; Phase 11 mobile polish + a11y branch chosen as next
 
-**Next action**: Plan Phase 6 (Photo upload pipeline). ROADMAP goal: iPhone HEIC files converted to JPEG client-side, resized to 2048px max longest-edge, EXIF stripped, uploaded to OCI Object Storage via PAR, thumbnails generated server-side, photo detail sheet opens on overlay tap.
+**Next action**: Plan Phase 11 — the "mobile polish + a11y audit" branch of the Phase 11 fork (Phase 10 MP4 stays on hold). High-leverage right after this UAT round because the mobile-polish signal is freshest in memory. ROADMAP goal: round out iPhone gestures + visual polish + a11y for v1.0.0 launch.
 
-Phase 6 is where the cinematic surface gets its actual photos. REEL-09's "cycling photos" half — deferred from Phase 5 — gets implemented here once photos exist. The `ChapterGroup.members` array is already preserved on the type for that purpose; Phase 6 wires the cycling animation.
+Open items that intersect Phase 11 (worth triaging into the plan):
+- 3 deferred-from-Phase-7 mobile UAT items: iPhone 60FPS orbit sustain, iOS globe projection rendering, mixed-case URL resolution on the deployed stack.
+- Phase 8 findings F1–F8 (post-deploy follow-ups) — many may already be addressed by this UAT round; needs a pass.
+- Pending todos (above): Lighthouse mobile audit on `bun run preview`, framer-motion chunking, visual reviews of Phase 2 motion + Phase 3 routes on iPhone, Phase 5 housekeeping carry-overs (cities.test.ts split, formatArrived extract, mapReadyTick refactor, marker diffing).
 
-Phase 6 also is where the existing public reel surface (`/`, `/u/:handle`) starts looking like a real product — Phase 7 will wire the per-handle data fetch, but Phase 6 photos will already render on `/app/` reels.
-
-Codebase map (`.planning/codebase/`) was refreshed before Phase 5 (2026-05-09). Phase 5 added: server validation/, db/pgError.ts, components/CityList.tsx, components/CityForm.tsx, reel/groupChapters.ts, geocode/bigdatacloud.ts, routes for AppReelRoute/TripsRoute. Worth a `/gsd-map-codebase` refresh before Phase 6 planning, OR have the planner cite the missing parts.
+Codebase map (`.planning/codebase/`) refreshed before Phase 5 (2026-05-09) — now stale by 5 phases (5→9 + UAT round). Phase 5–9 + UAT delta not yet documented: Phase 6 photo pipeline, Phase 7 public-URL routing, Phase 8 deploy infra, Phase 8.1 Terraform IaC, Phase 9 GHA CI/CD, UAT-round timing/motion constants, PlayPauseIndicator, mid-flight retarget state-machine condition, RequireAuth signup-hint pass-through. `/gsd-map-codebase` refresh recommended before Phase 11 planning.
 
 ## Notable Artifacts
 
@@ -203,4 +216,4 @@ Codebase map (`.planning/codebase/`) was refreshed before Phase 5 (2026-05-09). 
   - `feedback_mountedref_strictmode.md` — useRef(true) + cleanup-only effect leaves ref stuck at false after StrictMode double-mount
 
 ---
-*Last updated: 2026-05-14 after Phase 6 closure (commits 9038eda, 5f30cda, a8933b9, ce04aa2).*
+*Last updated: 2026-06-19 after iPhone UAT round closure at v0.2.4. Five UAT patch releases summarized in the "iPhone UAT Round" table above. Next: Phase 11 mobile polish + a11y branch.*
