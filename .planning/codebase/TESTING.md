@@ -1,94 +1,122 @@
-# Testing Patterns
+# Testing
 
-**Analysis Date:** 2026-04-27
-**Phase:** Post-Phase 4 (Vitest live; 88 tests across frontend + server)
+**Analysis Date:** 2026-06-19
 
-## Test Framework
+## Framework
 
-**Runner:** Vitest 4.1.5 (`devDependencies` in `package.json:52`).
-**Coverage:** `@vitest/coverage-v8` 4.1.5 — v8 provider (`vitest.config.ts:20`).
-**Config:** `/Users/bryanlam/Workspaces/timeline-revamp/vitest.config.ts` — Node environment, globals on, single suite spans both `src/**` and `server/**`.
+**Vitest 4.x** is the single test runner. No Jest, no Bun's built-in `bun test`.
 
-## Run Commands
+**Critical:** Run tests via `bun run test` (which invokes `vitest run`). Do NOT run `bun test` directly — Bun's built-in runner does not resolve the `@/` path alias from `vite.config.ts` and the import-graph will fail with `Cannot find module '@/...'`.
 
-```bash
-bun run test            # vitest run — single pass, what CI uses
-bun run test:watch      # vitest — watch mode
-bun run test:coverage   # vitest run --coverage — v8 lcov + text report
+Scripts in `package.json`:
+- `bun run test` — `vitest run` (CI mode, one-shot)
+- `bun run test:watch` — `vitest` (watch mode for development)
+- `bun run test:coverage` — `vitest run --coverage`
+- `bun run typecheck` — `tsc -b --noEmit`
+
+**Total test count: 415** as of UAT round close (v0.2.4). Growth trajectory:
+- Post-Phase 4: 88 tests
+- Post-Phase 5: 140 tests (+52)
+- Post-Phase 6: 235 tests (+95)
+- Post-Phase 7: 348 tests (+113)
+- Post-Phase 9 + UAT: 415 tests (+67 across UAT for PlayPauseIndicator + mid-flight retarget tests + workflow-fix tests)
+
+## Environment Selection (Per-File, Not Global)
+
+`vitest.config.ts` defaults to the **Node** environment. Browser-dependent tests opt in to **jsdom** via a per-file annotation at the top of the file:
+
+```ts
+// @vitest-environment jsdom
+import { describe, it, expect } from 'vitest';
 ```
 
-**CRITICAL: use `bun run test`, NOT `bun test`.** Bare `bun test` invokes Bun's native test runner which (a) doesn't load `vitest.config.ts` and therefore doesn't resolve the `@/` alias, and (b) doesn't recognize Vitest's `describe`/`it`/`expect` globals from the `vitest/globals` types. Always go through the npm script so `vitest` runs.
+**Why per-file, not global:** the `jose` library (used by `server/auth/jwt.ts` for JWKS validation) does Uint8Array coercion that fails inside jsdom's environment. Server tests therefore stay in node; only frontend component tests opt in to jsdom.
 
-## Test Inventory (88 total)
+**Examples:**
+- Node (default): `server/routes/*.test.ts`, `src/data/*.test.ts`, `src/gestures/stateMachine.test.ts`, `src/reel/timing.test.ts`, `src/photos/*.test.ts`.
+- jsdom: `src/reel/PlayPauseIndicator.test.tsx`, `src/components/PhotoUploader.test.tsx`, `src/auth/HandlePickerModal.test.tsx`, `src/routes/TripsRoute.test.tsx`, etc.
 
-| File                                          | Count | Coverage Target                               |
-|-----------------------------------------------|-------|-----------------------------------------------|
-| `src/gestures/stateMachine.test.ts`           | 85    | `stateMachine.ts` — 100% line + branch        |
-| `server/auth/jwt.test.ts`                     |  3    | `requireJwt` middleware — AUTH-02 SC #4 gate  |
+## Mock Injection Pattern (`__setXClientForTest`)
 
-No e2e tests (no Playwright yet). No integration tests against Postgres yet. No React component tests (no jsdom/RTL configured — Vitest env is `node`).
+Server modules that depend on lazily-constructed external clients expose a test-only injection hook so tests can substitute fakes without monkey-patching globals.
 
-## Test File Organization
+**Examples:**
+- `server/oci/parClient.ts` — `__setOciClientForTest(client | null)` overrides `getOciClient()`. The PEM file is read only at first call; if a test imports any route that calls `getOciClient()` during module load, the test MUST inject a fake BEFORE the import resolves, or it'll `EACCES` on the missing PEM in CI. See `server/routes/publicReel.test.ts` for the pattern.
+- `server/auth/jwt.ts` — `__setJwksGetterForTest(getter)` overrides the JWKS fetch. Tests use `jose.SignJWT` + `createLocalJWKSet` to mint test tokens with no live Auth0 needed.
 
-- **Co-located with source:** `src/gestures/stateMachine.test.ts` sits beside `stateMachine.ts`; `server/auth/jwt.test.ts` sits beside `jwt.ts`.
-- **Naming:** `<module>.test.ts` matches Vitest's default include and the `vitest.config.ts` patterns (`src/**/*.test.ts`, `src/**/*.test.tsx`, `server/**/*.test.ts`).
-- **Coverage scope** (`vitest.config.ts:21-29`): includes `src/**/*.{ts,tsx}` and `server/**/*.ts`; excludes test files, `src/main.tsx` (entrypoint), `src/vite-env.d.ts`, and `src/data/**` (pure data tables).
+**Critical lesson** (memory: `feedback_we_dont_need_the_mock_is_usually_wrong.md`): lazy SDK getters fire BEFORE method calls. A route that does `import { citiesRouter }` triggers any `getOciClient()` at the top level of dependent modules. **Always inject `__setXClientForTest` mocks unless you've personally verified the import graph never reaches the getter.**
 
-## Patterns
+## StrictMode-Aware Test Patterns
 
-### Pure-function unit tests (`stateMachine.test.ts`)
+React 18 StrictMode double-invokes effects in dev. Two patterns to know:
 
-The state machine is a pure `(state, event, totalChapters) => state` function, so tests call it directly — no mocks, no setup. A `withState(overrides)` helper merges partial state over `initialState(TOTAL)` (`stateMachine.test.ts:10-12`):
+**`mountedRef` re-anchor inside effect body** (memory: `feedback_mountedref_strictmode.md`):
 
-```typescript
-function withState(overrides: Partial<ReelState>): ReelState {
-  return { ...initialState(TOTAL), ...overrides };
-}
+```ts
+const mountedRef = useRef(true);
+useEffect(() => {
+  mountedRef.current = true;          // re-anchor on (re-)mount
+  return () => { mountedRef.current = false; };
+}, []);
 ```
 
-Suites are organized by event type (`describe('VIS_HIDDEN', ...)`, etc.), with one `it` per source/target state pair. This is what gets to 100% line + branch coverage on `stateMachine.ts` — every transition has a dedicated assertion.
+Tests that exercise StrictMode (e.g. `PhotoDetailSheet.test.tsx`) double-mount via `<StrictMode>` wrapper and assert the Save button does not get stuck in "Saving" state — the bug class this pattern guards against.
 
-### Middleware tests with in-memory JWKS (`server/auth/jwt.test.ts`)
+**Timer cleanup in async effects** — when a hook schedules `setTimeout` / `setInterval`, the test must verify cleanup runs on unmount. Most reel tests use `vi.useFakeTimers()` + `vi.advanceTimersByTime(N)` to step through timers deterministically.
 
-The JWT middleware test mints real RS256 tokens against an in-memory keypair using `jose` — no live Auth0 tenant needed:
+## Hermetic-Constant Tests
 
-1. Set `process.env.{DATABASE_URL,AUTH0_DOMAIN,AUTH0_AUDIENCE}` BEFORE the dynamic import of `./jwt.js` (`jwt.test.ts:16-18`). Reason: `server/env.ts` validates synchronously at import time and calls `process.exit(1)` on failure — top-level static imports would race the env setup and kill the runner.
-2. `beforeAll` generates an RS256 keypair with `jose.generateKeyPair`, exports the public half as a JWK with a fixed `kid`, and installs it via `__setJwksGetterForTest(createLocalJWKSet({ keys: [jwk] }))` (`jwt.test.ts:28-40`).
-3. Each test uses a `mint(opts)` helper around `jose.SignJWT` to produce expired / wrong-audience / valid tokens, then exercises a fresh Hono app with `app.request('/me', { headers: { authorization: ... } })`.
+When a test depends on a UAT-tunable constant (e.g., `AUTOPLAY_DWELL_MS`, `FLY_DURATION_MS`), it MUST pin the constant explicitly via prop rather than read the module's exported value.
 
-Three assertions cover the AUTH-02 SC #4 gate: expired → 401, wrong audience → 401, valid → 200 with `c.var.auth0Sub` set.
+**Example** (`src/reel/PhotoCycle.test.tsx`):
 
-**Why it's structured this way:**
-- `__setJwksGetterForTest` is exported with a `__` prefix so it's visually flagged as test-only (`server/auth/jwt.ts:32`).
-- The `localGetter as never` cast (`jwt.test.ts:39`) bridges `createLocalJWKSet` and `createRemoteJWKSet` getter types — runtime shape is identical, only the named type differs.
-- Hono's built-in `app.request(...)` lets us run middleware against synthetic Requests without a server socket.
+```ts
+// Bad — breaks when UAT tunes AUTOPLAY_DWELL_MS:
+render(<PhotoCycle photos={twoPhotos} />);
+vi.advanceTimersByTime(2250); // 4500/2 from a past constant
 
-## Mocking Philosophy
+// Good — hermetic against tuning:
+render(<PhotoCycle photos={twoPhotos} dwellMs={4500} />);
+vi.advanceTimersByTime(2250);
+```
 
-- **Don't mock pure functions.** The state machine has no mocks anywhere — it's just called.
-- **Don't mock at the network layer when you can swap a dependency.** `jwt.test.ts` swaps the JWKS getter, not `fetch`.
-- **No MapLibre or React component mocks** — there are no component tests yet; when they land, RTL + a real DOM env (jsdom or happy-dom) will be required.
+This pattern was introduced in UAT round v0.2.0 when bumping `AUTOPLAY_DWELL_MS` 4500 → 8000 broke `PhotoCycle.test.tsx`'s hardcoded `2250ms` and `1500ms` expectations.
 
-## Coverage
+`src/reel/timing.test.ts` similarly tests the `cycleIntervalForPhotoCount` formula by passing explicit `dwellMs` arguments rather than relying on the default `AUTOPLAY_DWELL_MS`.
 
-Run `bun run test:coverage`. Reports go to stdout (text) and `coverage/` (lcov + html). Current state machine coverage is 100% line + branch by design — every transition is asserted. JWT middleware coverage is partial (the three SC #4 paths) — the missing-bearer and missing-sub branches are not yet asserted but are easy adds.
+## Grep-Enforced Project Invariants (Meta-Tests)
 
-The 80% project-wide target from `~/.claude/rules/common/testing.md` is not met overall (most of `src/**` and `server/**` is uncovered) — that's intentional for now, with component tests and Postgres integration tests gated on later phases.
+Files named `__*.test.ts` (double-underscore prefix) are project invariants enforced by code-search. They walk the codebase and fail the build if a forbidden pattern is present.
 
-## Anti-Patterns to Avoid
+**Example** — `server/auth/__no-bigdatacloud.test.ts`:
+- Walks `server/**/*.ts` and fails if any file mentions the string `bigdatacloud`.
+- Enforces the Phase 5 decision: BigDataCloud reverse-geocoding is client-side only per the provider's Fair Use Policy.
 
-- **`bun test` instead of `bun run test`** — Bun's native runner doesn't resolve `@/` and ignores `vitest.config.ts`.
-- **Top-level static `import` of `./jwt.js` in `jwt.test.ts`** — env validation will run before the test sets env vars and the runner dies. Use the `await import(...)` pattern.
-- **Mocking the gesture state machine.** It's pure — call it directly.
-- **Hitting real Auth0 in unit tests.** Use the in-memory JWKS pattern.
-- **JSDOM for `prefers-reduced-motion`.** JSDOM's matchMedia is a stub; reach for Playwright `reducedMotion` emulation when component tests land.
+**Hazard** (memory: `feedback_grep_guard_vs_comments.md`): grep-based acceptance guards count comment text. If you want to discuss a banned pattern in a comment, **paraphrase** or **strip the literal** — `// uses the geocoding service that begins with B` rather than `// not bigdatacloud`. The double-underscore meta-test would fail on the latter.
 
-## Planned Additions (not yet wired)
+## CI Test Environment (GHA `verify` job)
 
-- React Testing Library for `ChapterRail`, `ChapterOverlay`, `ReducedMotionReel` (requires switching `vitest.config.ts:12` env to `jsdom` or per-file `// @vitest-environment jsdom`).
-- Postgres integration tests using a Drizzle schema migration against a disposable Docker pg container.
-- Playwright E2E for the public reel auto-play, reduced-motion fallback, and keyboard controls.
+`.github/workflows/deploy.yml` `verify` job:
+- Runs on `ubuntu-latest` with `actions/checkout@v5` + `oven-sh/setup-bun@v2` (bun-version: `1.3.12`).
+- Postgres 16 service container at `localhost:5432` with `timeline:timeline_ci_pw@timeline`.
+- Stub env vars set in `env:` block: `AUTH0_DOMAIN=test.example.auth0.com`, `AUTH0_AUDIENCE=https://api.test.example.com` (memory: `feedback_module_load_env_validation_blocks_ci.md` — Zod parse at module load needs these stubs even for unit tests that mock auth).
+- Steps: `bun install --frozen-lockfile` → `bun run typecheck` → `bun run db:migrate` (against the service Postgres) → `bun run test`.
+- `db:migrate` is needed because integration tests (`publicReel.test.ts`, `cities.test.ts`, `photos.test.ts`) require a migrated schema.
 
----
+## Coverage Targets
 
-*Testing refreshed: 2026-04-27*
+- `stateMachine.ts`: **100% line + branch coverage** (Phase 2 decision; pure-function-easy goal).
+- Other modules: no formal threshold; coverage check on critical paths is the practice (cities CRUD, photos pipeline, gesture transitions).
+- `bun run test:coverage` generates the report; not enforced in CI yet.
+
+## Naming + Layout Conventions
+
+- Co-located: `src/reel/timing.ts` + `src/reel/timing.test.ts`. Server: `server/routes/cities.ts` + `server/routes/cities.test.ts`.
+- Component tests: `.test.tsx` (TSX needed for JSX in tests). Pure-logic tests: `.test.ts`.
+- File-size ceiling: ~800 lines for test files. **`server/routes/cities.test.ts` is at 945 lines** (over) — flagged in CONCERNS.md for natural splits (`cities.read.test.ts`, `cities.write.test.ts`, `cities.reorder.test.ts` + shared `cities.test.helpers.ts`).
+- React Testing Library is the component-testing primitive. `render`, `screen.getByRole/Text/TestId`, `userEvent` for interactions.
+- `data-testid` used sparingly — prefer role/text queries. Allowed where the visual element has no semantic role (e.g. `data-testid="play-pause-transient"` in `PlayPauseIndicator.tsx`).
+
+## Stream-Watchdog Recovery (Operational Pattern)
+
+When executor agents stall mid-test-suite (observed in Phases 5/6/7 — 4 occurrences), atomic-per-task commits make recovery trivial: `git log --oneline` shows the last completed task, `ls` shows what made it to disk, fresh agent can resume from the next task. This is a workflow-level pattern, not a test framework concern, but it has shaped the per-task commit discipline that lets tests serve as the source of truth on recovery.

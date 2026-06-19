@@ -1,238 +1,320 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-04-27
-**Phase:** Post-Phase 4 — frontend route tree (Phase 3) + backend skeleton + Auth0 + lazy provisioning (Phase 4) shipped. Phase 5 (city CRUD + map picker) is the next layer to land.
+**Analysis Date:** 2026-06-19
 
-## Directory Layout
+**Phase context:** Phase 9 complete + live-verified (v0.2.4). All phases 1–9 + iPhone UAT round reflected below.
+
+## Top-Level Directory Layout
 
 ```
 timeline-revamp/
-├── docs/                    # Snapshots of gstack-canonical planning docs
-│   ├── plan.md              #   master implementation plan, Phase 1-12 schedule
-│   └── test-plan.md         #   /qa input — affected pages, edge cases, critical paths
-├── .planning/               # GSD durable planning + codebase map (survives compaction)
-│   ├── PROJECT.md           #   product framing, decisions table
-│   ├── REQUIREMENTS.md      #   numbered requirements (REEL-*, AUTH-*, DATA-*, etc.)
-│   ├── ROADMAP.md           #   12 phases with success criteria + plan list
-│   ├── STATE.md             #   current execution state (which phase/plan is live)
-│   ├── TODOS.md             #   tactical todos
-│   ├── codebase/            #   THIS DIR — STACK / INTEGRATIONS / ARCHITECTURE / STRUCTURE / CONVENTIONS / TESTING / CONCERNS
-│   └── phases/              #   per-phase plans
+├── docs/                       # Snapshot copies of gstack planning artifacts (read-only mirrors)
+│   ├── plan.md                 #   master implementation plan
+│   └── test-plan.md            #   /qa input — affected pages, edge cases
+├── .planning/                  # GSD durable planning (survives compaction)
+│   ├── PROJECT.md              #   product framing, decisions table
+│   ├── REQUIREMENTS.md         #   numbered requirements (REEL-*, AUTH-*, DATA-*, etc.)
+│   ├── ROADMAP.md              #   12 phases + success criteria
+│   ├── STATE.md                #   current state (bumped 2026-06-19 after UAT round)
+│   ├── TODOS.md                #   tactical todos
+│   ├── codebase/               #   THIS DIR — STACK / INTEGRATIONS / ARCHITECTURE / STRUCTURE / CONVENTIONS / TESTING / CONCERNS
+│   └── phases/                 #   per-phase artifacts
 │       ├── 02-reel-polish/
 │       ├── 03-app-shell/
-│       └── 04-backend-auth0/
+│       ├── 04-backend-auth0/
+│       ├── 05-city-crud/
+│       ├── 06-photo-upload-pipeline/
+│       ├── 07-public-urls-handle/
+│       ├── 08-deploy-part-1/
+│       ├── 08.1-infra-terraform/
+│       └── 09-deploy-part-2-empty-error-states/
 │
-├── src/                     # Frontend application code (Vite + React 19)
-│   ├── App.tsx              #   createBrowserRouter — five routes (see route map below)
-│   ├── main.tsx             #   ReactDOM.createRoot + StrictMode + maplibre-gl CSS hoist
-│   ├── index.css            #   Tailwind base + tokens (:root vars) + components + utilities
-│   ├── vite-env.d.ts        #   ImportMetaEnv typing for VITE_AUTH0_* + VITE_MAPTILER_KEY
-│   │
-│   ├── routes/              #   React Router v7 route components — one file per route
-│   │   ├── AppLayout.tsx    #     /app/* parent — AuthProvider → RequireAuth → HandlePickerGate → Outlet + BottomNav
-│   │   ├── AppReelRoute.tsx #     /app index — wraps Reel in `.app-reel-host` (BottomNav collision wrapper)
-│   │   ├── HandleReelRoute.tsx #  /u/:handle — Phase 9 will fetch real data; currently seeded reel
-│   │   ├── PublicReelRoute.tsx #  / — public reel, no auth, no fetch
-│   │   ├── TripsRoute.tsx   #     /app/trips — placeholder shell; Phase 5 fills in CRUD
-│   │   ├── MeRoute.tsx      #     /app/me — placeholder shell; Phase 5+ adds settings
-│   │   └── NotFoundRoute.tsx#     * — 404 with link back to /
-│   │
-│   ├── auth/                #   Auth0-aware components and hooks
-│   │   ├── AuthProvider.tsx #     Mounts <Auth0Provider> only inside AppLayout (AUTH-04 seam)
-│   │   ├── HandlePickerGate.tsx # Fetches /api/me; renders modal sibling when handle is null
-│   │   ├── HandlePickerModal.tsx# Form + client-side validation (shared with server) + POST /api/me/handle
-│   │   └── useApi.ts        #     useApi() / useApiJson<T>() — fetch with Bearer token attached
-│   │
-│   ├── components/          #   Layout-level components shared across the /app/* tree
-│   │   ├── RequireAuth.tsx  #     Calls loginWithRedirect on !isAuthenticated; "Signing in…" splash
-│   │   └── BottomNav.tsx    #     Fixed h-16 nav; tabs Reel | Trips | Me; amber active state
-│   │
-│   ├── reel/                #   Cinematic reel surface (the "movie" — single feature module)
-│   │   ├── Reel.tsx         #     Root composer — gesture machine + Suspense<MapCanvas> + overlays
-│   │   ├── MapCanvas.tsx    #     MapLibre wrapper — lazy-loaded; flyTo on chapter change
-│   │   ├── MapPoster.tsx    #     Suspense fallback; identical positioning to MapCanvas (no CLS)
-│   │   ├── ChapterOverlay.tsx #   Bottom-anchored: photo stack, city name, caption, date
-│   │   ├── ChapterRail.tsx  #     Bottom horizontal progress rail with scrub cursor (`data-chapter-rail`)
-│   │   ├── CTAPill.tsx      #     Top-right "Make your own →" pill + tagline
-│   │   ├── StateBadge.tsx   #     Dev affordance — current ReelStateName (DEV-only after Phase 2)
-│   │   ├── ReducedMotionReel.tsx # Static fallback (vertical scroll list of cities)
-│   │   └── usePrefersReducedMotion.ts # Live-updating matchMedia hook
-│   │
-│   ├── gestures/            #   Touch/mouse/keyboard input handling for the reel
-│   │   ├── stateMachine.ts  #     PURE — ReelState, ReelEvent, transition() + timing constants
-│   │   ├── stateMachine.test.ts # Vitest coverage of every transition (Phase 2 milestone)
-│   │   └── useGestureMachine.ts # React hook — owns timers, listeners, pointer tracking
-│   │
-│   ├── motion/              #   (currently empty/reserved — Framer Motion 11 is installed)
-│   │   └── variants.ts      #     Motion variants land here when Phase 2 motion polish ships
-│   │
-│   ├── data/                #   Static data; replaced by API calls in Phase 5+
-│   │   └── seeded-cities.ts #     10 hardcoded chapters Tokyo→Banff
-│   │
-│   └── types/               #   Cross-feature TS types
-│       └── reel.ts          #     Coordinates, PhotoSeed, CityChapter, ReelStateName
-│
-├── server/                  # Hono API (Bun runtime, tsx for dev)
-│   ├── index.ts             #   Hono app: GET /health + /api/health public; /api/me{,/*} authed chain
-│   ├── env.ts               #   Zod-validated env (DATABASE_URL, PORT, AUTH0_DOMAIN, AUTH0_AUDIENCE)
-│   │
-│   ├── auth/                #   JWT validation + lazy user provisioning
-│   │   ├── jwt.ts           #     requireJwt middleware — jose + createRemoteJWKSet, RS256, iss + aud
-│   │   ├── jwt.test.ts      #     Vitest — mints local tokens via __setJwksGetterForTest seam
-│   │   ├── lazyProvision.ts #     SELECT-or-INSERT users keyed by auth0_sub; sets c.var.user
-│   │   └── context.ts       #     `declare module 'hono'` augmentation for ContextVariableMap
-│   │
-│   ├── handles/             #   Shared handle validator (imported by frontend via @server alias)
-│   │   ├── validate.ts      #     Regex + reserved-words check; discriminated-union result
-│   │   └── reservedWords.ts #     Frozen Set — admin/api/app/u/auth/login/etc.
-│   │
-│   ├── routes/              #   Hono sub-routers (one file per resource family)
-│   │   └── me.ts            #     GET /api/me, POST /api/me/handle (with PG 23505 → 409 mapping)
-│   │
-│   └── db/                  #   Drizzle schema + Postgres client
-│       ├── schema.ts        #     pg-core: users, cities, photos, notifications + $inferSelect types
-│       ├── client.ts        #     Single pg.Pool drizzled with the schema namespace
-│       ├── migrate.ts       #     `bun run db:migrate` entrypoint (one-shot pg.Client)
-│       └── migrations/
-│           ├── 0000_panoramic_deathbird.sql   # Generated: tables + FK cascades + uniques
-│           ├── 0001_cities_deferrable_unique.sql # HAND-AUTHORED — owns DATA-02 deferrable constraint
-│           └── meta/                           # drizzle-kit journal + snapshot files
-│
-├── scripts/
-│   └── dev.ts               # Spawns Vite + Hono in parallel; prefixed [web]/[api] output; signal forwarding
-│
-├── dist/                    # Vite build output (gitignored)
-├── node_modules/            # bun install (gitignored)
-├── .gstack/                 # gstack project state (gitignored)
-├── .git/                    # Git internals
-│
-├── index.html               # Single HTML entry; Google Fonts preconnect; theme-color #0A0E1A
-├── package.json             # Scripts: dev, dev:web, dev:api, build, typecheck, test*, db:up/down/generate/migrate/studio
-├── bun.lock                 # bun lockfile, committed
-├── docker-compose.yml       # postgres:16 service (named volume `pgdata`, port 5432)
-├── drizzle.config.ts        # Drizzle Kit: schema=server/db/schema.ts, out=server/db/migrations
-├── tsconfig.json            # Project references → app + node + server
-├── tsconfig.app.json        # Strict TS for src/, @/ alias
-├── tsconfig.node.json       # Strict TS for vite.config.ts + scripts/
-├── tsconfig.server.json     # Strict TS for server/ (NodeNext module resolution)
-├── vite.config.ts           # @vitejs/plugin-react + @/ + @server aliases + /api proxy + manualChunks
-├── vitest.config.ts         # Vitest config (jsdom for src/, node for server/)
-├── tailwind.config.ts       # Theme extension (colors, fonts, easings, container-queries plugin)
-├── postcss.config.js        # tailwindcss + autoprefixer
-├── DESIGN.md                # Visual / UX design system (CLAUDE.md routes here before UI changes)
-├── README.md                # Project overview, status, doc pointers
-├── CLAUDE.md                # Routing rules + design-system pointer
-├── TODOS.md                 # v2 backlog (everything explicitly cut from v1)
-├── .env.example             # Documented env contract (VITE_AUTH0_*, VITE_MAPTILER_KEY, AUTH0_*, DATABASE_URL)
-├── .env.local               # Per-developer secrets (gitignored)
-└── .gitignore               # node_modules, dist, *.tsbuildinfo, .gstack/, .env*
+├── src/                        # Frontend (Vite + React 19)
+├── server/                     # Backend (Bun + Hono)
+├── infra/                      # Terraform + cloud-init + DEPLOY.md
+├── ops/                        # Nginx config
+├── public/                     # Static assets (UAT v0.2.0 added seed-photos/)
+├── test/                       # Test setup (jsdom polyfills)
+├── scripts/                    # Dev orchestrator
+├── .github/workflows/          # CI/CD
+├── docker-compose.yml          # Postgres only (base; loopback bind)
+├── docker-compose.prod.yml     # Adds api with image: + scp'd to VM by deploy.yml
+├── Dockerfile                  # Multi-stage build (deps/build/runtime; uid 1001 app user)
+├── package.json                # Bun-runs-everything; scripts: dev, dev:web, dev:server, build, test, test:watch, test:coverage, typecheck, db:generate, db:migrate
+├── bun.lock                    # Committed lockfile
+├── vite.config.ts              # Path alias @/ → src/, @server/ → server/ (narrow door for shared validator)
+├── tailwind.config.ts          # Design tokens — amber palette, easings, motion durations, fonts
+├── tsconfig{,.app,.node}.json  # Project references: app + node
+├── drizzle.config.ts           # Drizzle Kit config for db:generate
+├── DESIGN.md                   # Design contract — read before any UI change
+├── CLAUDE.md                   # AI rules for this project
+└── README.md
 ```
 
-> Note: there is no `public/` directory. Vite serves static assets directly from `index.html` and bundle output; no extra static-asset directory has been added yet.
+## `src/` — Frontend
 
-## Route Map
+```
+src/
+├── App.tsx                     # createBrowserRouter — five routes; `/`, `/u/:handle`, `/app/*`, `*`
+├── main.tsx                    # ReactDOM.createRoot + StrictMode + maplibre-gl CSS hoist
+├── index.css                   # Tailwind base + design tokens + `.scrim-*` + `.glass-pill` + `.app-reel-host`
+├── vite-env.d.ts               # ImportMetaEnv typing for VITE_AUTH0_* + VITE_MAPTILER_KEY
+│
+├── routes/                     # React Router v7 route components
+│   ├── AppLayout.tsx           #   /app/* parent — AuthProvider → RequireAuth → HandlePickerGate
+│   ├── AppReelRoute.tsx        #   /app — wraps Reel in `.app-reel-host` (BottomNav z-index wrapper)
+│   ├── AppReelRoute.test.tsx
+│   ├── HandleReelRoute.tsx     #   /u/:handle — fetches /api/u/:handle/reel, branches Reel/Orbit/Globe
+│   ├── HandleReelRoute.test.tsx
+│   ├── MeRoute.tsx             #   /app/me — Auth0 avatar + name + email + Sign Out (Phase 8 commit 4aa9479)
+│   ├── NotFoundHandleRoute.tsx #   /u/:handle 404 (when handle doesn't exist)
+│   ├── NotFoundRoute.tsx       #   * — generic 404 with "Back to reel" link
+│   ├── PublicReelRoute.tsx     #   / — SEEDED_CITIES, no auth, no fetch
+│   ├── TripsRoute.tsx          #   /app/trips — MapPicker + CityList + draft/edit CityForm
+│   └── TripsRoute.test.tsx
+│
+├── auth/                       # Auth0-aware
+│   ├── AuthProvider.tsx        #   <Auth0Provider> mount; throws on missing VITE_AUTH0_* envs
+│   ├── HandlePickerGate.tsx    #   Renders modal sibling when handle is null
+│   ├── HandlePickerModal.tsx   #   Form + double-Esc anti-modal-trap workaround
+│   ├── HandlePickerModal.test.tsx
+│   ├── suggestHandle.ts        #   Derives suggestion from Auth0 user identity (per F8 follow-up)
+│   └── useApi.ts               #   useApi() — fetch with Bearer attached
+│
+├── components/                 # Layout-level shared components
+│   ├── BottomNav.tsx           #   Fixed h-16 nav for /app/*; Reel | Trips | Me; amber active tab
+│   ├── CityForm.tsx            #   Create + edit; Zod-validated; date input timezone anchor
+│   ├── CityList.tsx            #   @dnd-kit/sortable list; drag handle is separate <button>
+│   ├── CityList.test.tsx
+│   ├── MapFallbackBanner.tsx   #   Banner shown when MapTiler 429 → OSM raster swap (ERR-03)
+│   ├── MapPicker.tsx           #   /app/trips map; click → reverse-geocode → CityForm
+│   ├── PhotoDetailSheet.tsx    #   Bottom-sheet modal for a city's photos
+│   ├── PhotoDetailSheet.test.tsx
+│   ├── PhotoGrid.tsx           #   Thumbnail grid inside PhotoDetailSheet
+│   ├── PhotoUploader.tsx       #   File picker → HEIC convert → resize → upload queue
+│   ├── PhotoUploader.test.tsx
+│   ├── PhotoViewer.tsx         #   Full-screen viewer with delete + nav (LOCKED in Phase 6)
+│   ├── PhotoViewer.test.tsx
+│   └── RequireAuth.tsx         #   Reads ?signup=1; forwards screen_hint to Auth0 (UAT v0.2.2)
+│
+├── reel/                       # The cinematic surface — single feature module
+│   ├── Reel.tsx                #   ≥2-chapter reel: gesture machine + MapCanvas + ChapterOverlay + PhotoCycle + PlayPauseIndicator
+│   ├── ReducedMotionReel.tsx   #   prefers-reduced-motion fallback — static scroll list of chapters
+│   ├── ReducedMotionVariants.test.tsx
+│   ├── OrbitReel.tsx           #   1-chapter orbit: 45°/s bearing rotation (useBearingOrbit)
+│   ├── OrbitReel.test.tsx
+│   ├── OrbitReducedMotionReel.tsx
+│   ├── GlobeReel.tsx           #   0-chapter: MapLibre setProjection({type:'globe'}) + slow rotation
+│   ├── GlobeReel.test.tsx
+│   ├── GlobeReducedMotionReel.tsx
+│   ├── MapCanvas.tsx           #   Lazy-loaded MapLibre canvas; flyTo with FLY_DURATION_MS/FLY_CURVE/easeCamera
+│   ├── MapCanvas.fallback.test.ts
+│   ├── MapPoster.tsx           #   LCP poster — dark radial gradient (no JPEG); Suspense fallback
+│   ├── mapStyle.ts             #   STYLE_URL constant: MapTiler 'hybrid' (UAT) or demotiles fallback
+│   ├── osmRasterStyle.ts       #   OSM raster fallback style for ERR-03
+│   ├── motion.ts               #   FLY_DURATION_MS = 8000, FLY_CURVE = 2.2, easeCamera() (UAT v0.2.0 tuned)
+│   ├── timing.ts               #   AUTOPLAY_DWELL_MS = 8000, CROSSFADE_MS = 200, MIN_CYCLE_INTERVAL_MS = 800 (UAT v0.2.0 tuned)
+│   ├── timing.test.ts          #   Hermetic against AUTOPLAY_DWELL_MS tuning (UAT v0.2.0 rewrite)
+│   ├── ChapterOverlay.tsx      #   Bottom-anchored city name + caption + photo stack
+│   ├── ChapterRail.tsx         #   Horizontal scrub indicator at bottom
+│   ├── PhotoCycle.tsx          #   Cross-fade rotating photos within a chapter
+│   ├── PhotoCycle.test.tsx     #   Pins dwellMs explicitly (UAT v0.2.0 hermetic fix)
+│   ├── chaptersWithPhotos.ts   #   Joins ChapterGroup + photos
+│   ├── chaptersWithPhotos.test.ts
+│   ├── groupChapters.ts        #   Collapse adjacent same-coord cities → ChapterGroup
+│   ├── groupChapters.test.ts
+│   ├── CTAPill.tsx             #   "Make your own" — links to /app?signup=1 (UAT v0.2.2)
+│   ├── PlayPauseIndicator.tsx  #   UAT v0.2.0 ADDITION — transient + persistent toggle UI
+│   ├── PlayPauseIndicator.test.tsx
+│   ├── StateBadge.tsx          #   DEV-only state debugger (gated on import.meta.env.DEV)
+│   ├── useBearingOrbit.ts      #   Hook driving OrbitReel's 45°/s rotation
+│   ├── useBearingOrbit.test.ts
+│   └── usePrefersReducedMotion.ts
+│
+├── gestures/                   # Reel input layer
+│   ├── stateMachine.ts         #   PURE — transitions; UAT v0.2.0 relaxed flick-from-CHAPTER_SWIPE for mid-flight retarget
+│   ├── stateMachine.test.ts    #   +3 new tests for mid-flight retarget (UAT v0.2.0)
+│   └── useGestureMachine.ts    #   EFFECTFUL — UAT v0.2.0 split timer effects so pointerCount doesn't reset fly-done
+│
+├── data/                       # Data shaping
+│   ├── seeded-cities.ts        #   9-city HK→SF itinerary (UAT v0.2.0); PhotoCard-based with /seed-photos/<city>/1.jpg URLs
+│   ├── cityToChapter.ts        #   CityDTO → CityChapter mapping
+│   └── cityToChapter.test.ts
+│
+├── api/                        # Typed fetch clients
+│   ├── cities.ts
+│   ├── photos.ts
+│   ├── photos.test.ts
+│   ├── handlesCheck.ts
+│   ├── handlesCheck.test.ts
+│   ├── publicReel.ts
+│   └── publicReel.test.ts
+│
+├── hooks/                      # Custom hooks
+│   ├── useAllPhotos.ts
+│   ├── useAllPhotos.test.ts
+│   ├── usePhotosQuery.ts
+│   └── usePhotosQuery.test.ts
+│
+├── photos/                     # Client-side photo pipeline
+│   ├── heicToJpeg.ts           #   Lazy heic-to wasm
+│   ├── heicToJpeg.test.ts
+│   ├── canvasResize.ts         #   Canvas → JPEG blob with max-dim 2048
+│   ├── canvasResize.test.ts
+│   ├── retry.ts                #   Exponential backoff helper
+│   ├── retry.test.ts
+│   ├── uploadQueue.ts          #   p-limit (ESM-only) + per-photo retry
+│   └── uploadQueue.test.ts
+│
+├── geocode/                    # Client-side reverse-geocode
+│   └── bigdatacloud.ts         #   Fetches BigDataCloud API; CI-enforced server-side via __no-bigdatacloud.test.ts
+│
+├── motion/                     # Framer Motion variants (shared)
+│   └── variants.ts             #   Stagger containers + arrival pulse variants
+│
+└── types/                      # Shared types
+    ├── city.ts                 #   CityDTO
+    └── reel.ts                 #   CityChapter, ReelStateName, PhotoSeed, PhotoCard, ReelPhoto, isPhotoCard
+```
 
-| Path | Component | Auth | Notes |
-|------|-----------|------|-------|
-| `/` | `PublicReelRoute` | None | Public reel from `SEEDED_CITIES`; no fetch, no Auth0 SDK loaded |
-| `/u/:handle` | `HandleReelRoute` | None | Phase 3 stub — sets `document.title`, renders seeded reel; Phase 9 fetches per-handle |
-| `/app` | `AppLayout` → index `AppReelRoute` | Required | Wraps reel in `.app-reel-host` so BottomNav clears the ChapterRail |
-| `/app/trips` | `AppLayout` → `TripsRoute` | Required | Placeholder; Phase 5 lands map-pick + city CRUD |
-| `/app/me` | `AppLayout` → `MeRoute` | Required | Placeholder |
-| `*` | `NotFoundRoute` | None | 404 with link back to `/` |
+## `server/` — Backend
 
-Mount order inside `AppLayout` (`src/routes/AppLayout.tsx:24-37`):
-`AuthProvider → RequireAuth → HandlePickerGate → <div class="min-h-dvh bg-bg text-ink pb-16"> Outlet + BottomNav </div>`
+```
+server/
+├── index.ts                    # Hono app — middleware order: requestId → logger → CORS → routes
+├── env.ts                      # Zod-parsed env; module-load process.exit on missing (CI stub required)
+│
+├── auth/
+│   ├── jwt.ts                  #   requireJwt — jose + JWKS RS256; __setJwksGetterForTest hook
+│   ├── jwt.test.ts
+│   ├── lazyProvision.ts        #   lazyProvisionUser — INSERT users on first JWT; sets c.var.user
+│   ├── context.ts              #   Hono ContextVariableMap augmentation (side-effect import)
+│   └── __no-bigdatacloud.test.ts  # Meta-test: forbid "bigdatacloud" string in server/**/*.ts
+│
+├── routes/
+│   ├── health.ts               #   GET /api/health → {status,db}
+│   ├── health.test.ts
+│   ├── handlesCheck.ts         #   GET /api/handles/check?handle=... → {state}
+│   ├── handlesCheck.test.ts
+│   ├── publicReel.ts           #   GET /api/u/:handle/reel — public, case-insensitive LOWER() lookup
+│   ├── publicReel.test.ts
+│   ├── me.ts                   #   GET /api/me, POST /api/me/handle (claim)
+│   ├── cities.ts               #   GET / POST / PATCH / DELETE / PATCH /reorder (deferrable txn)
+│   ├── cities.test.ts          #   945 lines — flagged for split (CONCERNS.md)
+│   ├── photos.ts               #   nested router /api/cities/:cityId/photos + flat /api/photos/:id{/finalize}
+│   └── photos.test.ts
+│
+├── db/
+│   ├── client.ts               #   pg.Pool + drizzle()
+│   ├── schema.ts               #   users, cities, photos; DATA-02 OWNERSHIP NOTICE for the deferrable unique
+│   ├── pgError.ts              #   pgErrorCode(err) — unwraps DrizzleQueryError.cause.code
+│   ├── migrate.ts              #   bun run server/db/migrate.ts (CI + prod deploy)
+│   └── migrations/             #   0000_* drizzle-generated; 0001_cities_deferrable_unique.sql hand-authored
+│
+├── oci/
+│   ├── parClient.ts            #   PEM-based signer; getOciClient() singleton; sniffImageMime
+│   └── parClient.test.ts
+│
+├── validation/
+│   ├── cityInput.ts            #   Zod schemas for city create/update/reorder
+│   └── photoInput.ts           #   Zod schemas for photo upload-url + finalize
+│
+├── handles/
+│   ├── validate.ts             #   Shared with frontend via @server alias — validateHandle()
+│   └── reservedWords.ts        #   26 reserved handles
+│
+├── index.error.test.ts         # Server top-level error handler tests
+└── index.requestId.test.ts     # Request-ID propagation tests
+```
 
-## Directory Purposes
+## `infra/` and `ops/`
 
-**`src/routes/`:**
-- One TSX file per route component. Routes themselves are declared in `src/App.tsx`.
-- Convention: route components are thin — they pick a presentation (e.g., reduced-motion vs full reel) and render feature components from `src/reel/`, `src/auth/`, etc.
+```
+infra/
+├── DEPLOY.md                   # Operator runbook (Post-Provision SCP block; needs chmod 711 .oci/ added — F1 follow-up)
+├── cloud-init.yaml             # VM bootstrap (4 known bugs — Phase 8 F1)
+└── terraform/
+    ├── main.tf
+    ├── compute.tf              # OCI Ampere A1 VM (2 OCPU / 8GB)
+    ├── storage.tf              # Bucket with access_type = "ObjectRead" (Phase 8 F5 Path A; Path B = future)
+    ├── iam.tf
+    ├── oidc.tf                 # GHA OIDC trust (provider version pin landmine — memory)
+    └── variables.tf
 
-**`src/auth/`:**
-- Everything that imports `@auth0/auth0-react` lives here (or in `src/components/RequireAuth.tsx`). This is the AUTH-04 enforcement boundary — keeping Auth0 imports localised is what guarantees the public reel chunk stays Auth0-free.
-- `useApi()` is the single seam where access tokens leave the Auth0 context.
+ops/
+└── nginx/
+    └── timeline.conf           # Reverse proxy; public_reel cache; proxy_pass for /assets and SPA shell
+```
 
-**`src/components/`:**
-- Layout components used across the `/app/*` tree (`RequireAuth`, `BottomNav`). Reel-specific components live in `src/reel/` instead.
+## `public/` — Static assets
 
-**`src/reel/`:**
-- The cinematic reel — single feature module. Each component is its own file; the gesture machine is the only shared dependency.
+```
+public/
+└── seed-photos/                # UAT v0.2.0 ADDITION — 9 vertical CC0 Unsplash photos
+    ├── hong-kong/1.jpg
+    ├── taipei/1.jpg
+    ├── okinawa/1.jpg
+    ├── osaka/1.jpg
+    ├── bangkok/1.jpg
+    ├── singapore/1.jpg
+    ├── melbourne/1.jpg
+    ├── london/1.jpg
+    └── san-francisco/1.jpg
+```
 
-**`src/gestures/`:**
-- Pure transition function (`stateMachine.ts`) + effectful hook (`useGestureMachine.ts`) + tests. **Rule:** `stateMachine.ts` MUST stay free of React/DOM imports.
+Served at `/seed-photos/<city>/1.jpg` by Vite dev + Hono `serveStatic` prod.
 
-**`server/auth/`:**
-- JWT verification (`jwt.ts`), provisioning (`lazyProvision.ts`), and the Hono context augmentation (`context.ts`). The augmentation is imported for side effect by `server/index.ts:12`; do not delete it.
+## `.github/workflows/`
 
-**`server/handles/`:**
-- Cross-trust-boundary handle utilities. `validate.ts` and `reservedWords.ts` are the ONLY files frontend may import via `@server/...` (see `vite.config.ts:11-17`).
+```
+.github/workflows/
+├── deploy.yml                  # Tag-driven CI/CD — verify + build-and-push + deploy
+│                               # UAT v0.2.1 ADDED: scp compose files to VM
+│                               # UAT v0.2.4 BUMPED: Node 24 majors (actions/checkout@v5, docker/* @v4/@v7)
+└── terraform.yml.deferred      # Phase 8.1 Terraform workflow — deferred per OIDC trust gap
+```
 
-**`server/routes/`:**
-- One sub-router per resource family. `me.ts` today; Phase 5 will add `cities.ts` and possibly `trips.ts`.
+## Build & Path-Alias Conventions
 
-**`server/db/`:**
-- `schema.ts` is the Drizzle source of truth. `migrations/` contains both generated and hand-authored SQL — see DATA-02 ownership notice in `schema.ts:1-17` before regenerating.
-
-**`scripts/`:**
-- Local-only Node scripts. `dev.ts` is the only entry today; CI/deploy scripts land in Phase 9.
-
-**`docs/`:**
-- Snapshots of gstack-canonical planning docs. Authoritative source is `~/.gstack/projects/usbryanchlam-timeline-revamp/`.
-
-**`.planning/`:**
-- GSD durable planning. `codebase/` (this directory) is the codebase map; `phases/` holds per-phase plans; the top-level files are durable across compactions.
+- **`@/` → `src/`** — frontend imports use `@/components/...`, `@/reel/...`, etc. (`vite.config.ts:23`).
+- **`@server/` → `server/`** — narrow door from frontend to server for SHARED handle validator + reserved-words list ONLY (`vite.config.ts:24`). Frontend MUST NOT import anything else from `server/` — DB code + auth middleware would either compile-error (Node-only) or leak server contracts.
+- **`paths` in tsconfig** mirrors the Vite aliases.
+- **`paths-ignore`** in `.github/workflows/deploy.yml` excludes `infra/terraform/**`, `docs/**`, `.planning/**` from triggering CI.
 
 ## Naming Conventions
 
-**Files:**
-- Components: `PascalCase.tsx` (`AppLayout.tsx`, `BottomNav.tsx`, `MapCanvas.tsx`)
-- Hooks: `useCamelCase.ts` (`useApi.ts`, `useGestureMachine.ts`, `usePrefersReducedMotion.ts`)
-- Plain modules: `camelCase.ts` (`stateMachine.ts`, `lazyProvision.ts`, `seeded-cities.ts` is grandfathered)
-- Tests: co-located `*.test.ts` next to source (`stateMachine.test.ts`, `jwt.test.ts`)
-- SQL migrations: `NNNN_snake_case.sql` (drizzle-kit format; hand-authored files keep the same scheme — see `0001_cities_deferrable_unique.sql`)
+- **Routes:** `*Route.tsx` (e.g., `TripsRoute.tsx`). `AppLayout.tsx` is the only non-`Route`-suffixed top-level route component.
+- **Components:** PascalCase TSX files in `src/components/` and `src/reel/`.
+- **Hooks:** `use*.ts` in `src/hooks/`.
+- **State machines:** `*Machine.ts` pure, `use*Machine.ts` effectful wrapper.
+- **Tests:** co-located, same basename + `.test.{ts,tsx}`.
+- **Meta-tests:** `__*.test.ts` double-underscore prefix (project invariants).
+- **Hand-authored SQL migrations:** numbered with a description: `0001_cities_deferrable_unique.sql`.
+- **Phase plans:** `.planning/phases/NN-name/NN-MM-PLAN.md`, paired `*-SUMMARY.md`, plus `*-CONTEXT.md`, `*-RESEARCH.md`, `*-VERIFICATION.md`.
 
-**Routes:**
-- React Router paths use kebab-case lowercase. The `/u/:handle` segment is intentionally short (handles are reservedly distinct from `/app`).
+## Generated / Committed Artifacts
 
-**Imports:**
-- `@/` → `src/` (frontend)
-- `@server/` → `server/` (frontend may import ONLY from `@server/handles/*`; vite.config comment is load-bearing)
-- Server uses NodeNext resolution; relative imports include `.js` extensions even though sources are `.ts` (TypeScript NodeNext rule).
+- **`bun.lock`** — committed.
+- **`dist/`** — gitignored. Built by `bun run build` (CI) or `vite build` (dev).
+- **`node_modules/`** — gitignored.
+- **`.env`** / **`.env.*`** — gitignored (Phase 8 F7 hardening). `.env.example` whitelisted.
+- **`.oci/`** + **`*.pem`** — gitignored (Phase 8 F7 hardening).
+- **`.dev/certs/`** — gitignored; mkcert local CA for iPhone HTTPS dev (memory: `feedback_auth0_https_iphone_dev.md`).
+- **`drizzle/`** — Drizzle Kit metadata (`_meta`, `meta/`) committed for migration history.
 
-## Where to Add New Code
+## Files NOT to Edit Without Context
 
-| Adding... | Goes in... |
-|---|---|
-| A new `/app` route | New file under `src/routes/`, register as a child of `/app` in `src/App.tsx:13-21` |
-| A new public route | New file under `src/routes/`, register at root in `src/App.tsx:11-12`. **Do NOT** import from `src/auth/`. |
-| A reel overlay element | `src/reel/<NewComponent>.tsx`; render inside `Reel.tsx` |
-| A gesture event or state | `src/gestures/stateMachine.ts` (event union + transition case) → handler in `useGestureMachine.ts` → test in `stateMachine.test.ts` |
-| A visual token | `src/index.css` `:root` (CSS var) AND `tailwind.config.ts` `theme.extend` if a Tailwind utility is needed |
-| Static demo data | `src/data/<topic>.ts` with strict types from `@/types` |
-| A new API resource (e.g., cities for Phase 5) | `server/routes/<resource>.ts` (sub-router); mount in `server/index.ts` next to `meRouter`; add middleware chain `requireJwt + lazyProvisionUser` (or an equivalent) |
-| A new DB table or column | Edit `server/db/schema.ts` → `bun run db:generate` → review SQL → `bun run db:migrate`. **Do not modify `0001_cities_deferrable_unique.sql`** — owned by DATA-02. |
-| A hand-authored migration (e.g., a deferrable constraint) | New `NNNN_*.sql` file in `server/db/migrations/`; document ownership at the top of `server/db/schema.ts` so future `db:generate` runs leave it alone |
-| Auth0-aware component | `src/auth/` (or `src/components/` if it's layout-level). Render only inside `AppLayout`. |
-| A shared client/server utility | `server/<feature>/` and import from frontend via `@server/<feature>/*`; if more than handles need this, extend the alias allowlist comment in `vite.config.ts:11-17` |
-| A `scripts/` entry | `scripts/<name>.ts`; invoke via `tsx scripts/<name>.ts` (matches `package.json:dev`) |
-| Vitest tests | Co-locate as `*.test.ts` next to source. `src/gestures/stateMachine.test.ts` and `server/auth/jwt.test.ts` are the canonical examples. |
+- **`DESIGN.md`** — design contract. Update DESIGN.md atomically with any change to motion/color/spacing tokens.
+- **`server/db/schema.ts`** — DATA-02 OWNERSHIP NOTICE at top: do NOT add `uniqueIndex` for the deferrable constraint; it's in `0001_cities_deferrable_unique.sql`.
+- **`server/db/migrations/0001_cities_deferrable_unique.sql`** — hand-authored; reorder transaction depends on it.
+- **`docker-compose.prod.yml`** — UAT v0.2.1 set `image:` directive; required for the deploy to actually pull from OCIR.
+- **`.github/workflows/deploy.yml`** — multiple memory-recorded gotchas: GHA secrets read at job-start, tag-match guard, scp step (UAT v0.2.1), Node 24 majors (UAT v0.2.4).
+- **`server/env.ts`** — module-load `process.exit(1)` on missing env; CI must stub `AUTH0_DOMAIN`/`AUTH0_AUDIENCE` (memory: `feedback_module_load_env_validation_blocks_ci.md`).
 
-## Special Directories
+## What's NOT in the Codebase (Yet)
 
-**`server/db/migrations/`:**
-- Generated AND hand-authored SQL coexist here. The drizzle-kit `meta/` subdirectory is generated; do not edit by hand.
-
-**`.planning/`:**
-- Survives compaction. Treat it as durable state — refresh when architecture shifts (end of Phase 2, end of Phase 4 [now], end of Phase 6, end of Phase 9).
-
-**`.gstack/`:**
-- Local gstack project state. Gitignored. Authoritative copy is in `~/.gstack/projects/usbryanchlam-timeline-revamp/`.
-
-**`dist/`:**
-- Vite build output. Gitignored. Regenerated by `bun run build`.
-
----
-
-*Structure analysis: 2026-04-27*
+- **No `src/utils/`** — `formatArrived` is duplicated in `CityList.tsx` + `ChapterOverlay.tsx` (CONCERNS.md hygiene item).
+- **No `<ReelView />` abstraction** — selection logic duplicated across the 3 reel routes (CONCERNS.md refactor candidate).
+- **No formal a11y test layer** — Phase 11 scope.
+- **No Phase 10 MP4 worker** (BullMQ + Puppeteer + FFmpeg) — on hold by user choice.
+- **No Instance Principal auth for OCI** — PEM is still in the container (Phase 8 F8 follow-up, deferred).

@@ -1,94 +1,131 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-04-27
-**Phase context:** Phases 1-4 complete (reel + gestures, polish + perf, app shell + theme, backend skeleton + Auth0). Phase 5 (City CRUD + map picker) up next. Most W1 perf debt has been paid down; remaining items are smaller and well-scoped.
+**Analysis Date:** 2026-06-19
 
-## Active Tech Debt
+**Phase context:** Phase 9 complete + live-verified (v0.2.4 deployed via tag-driven GHA CI/CD to OCI Ampere A1 VM). iPhone UAT round just closed (5 patch releases). Phase 10 (MP4) on hold; Phase 11 (mobile polish + a11y audit branch) is next.
 
-**Auth0 `redirect_uri` disagrees with plan 04-02 setup guidance:**
-- Issue: `src/auth/AuthProvider.tsx:29` sends `redirect_uri: window.location.origin + '/app'`, but plan 04-02 (and the 04-02 SUMMARY's verification steps) tell the user to whitelist Allowed Callback URLs as origin-only (`http://localhost:5173`). User had to extend the Auth0 dashboard whitelist after first run.
-- Files: `src/auth/AuthProvider.tsx:29`, `.planning/phases/04-backend-auth0/04-02-PLAN.md`, `.planning/phases/04-backend-auth0/04-02-SUMMARY.md`
-- Impact: future fresh-tenant setup will hit the same dashboard landmine. Logged in `~/.claude/projects/-Users-bryanlam-Workspaces-timeline-revamp/memory/` Auth0 SPA feedback file.
-- Fix approach: either (a) edit `redirect_uri` to `window.location.origin` (origin-only) and add a post-callback `Navigate to="/app"`, or (b) patch the plan/SUMMARY to instruct whitelisting `http://localhost:5173/app`. Option (a) keeps the dashboard config simpler across environments. Tracked in STATE.md "Pending Todos".
+## Severity Index
 
-**Framer Motion in main chunk (not split):**
-- Issue: Only `maplibre-gl` is in `manualChunks` (`vite.config.ts:39-41`). `framer-motion` rides in the main `index-*.js` bundle (~432 KB minified pre-gzip; framer is ~37 KB gzip of that on the LCP path).
-- Files: `vite.config.ts:39-41`, `src/reel/ChapterOverlay.tsx:1`, `src/motion/variants.ts:16`
-- Impact: bundle size on first visit to `/` includes Framer even though the public reel could theoretically defer it past LCP. Lighthouse mobile audit hasn't been run yet to confirm whether this trips the ≥90 perf budget.
-- Fix approach: add `framer: ['framer-motion']` (and possibly `auth0: ['@auth0/auth0-react']`, since it's only used on `/app/*`) to `manualChunks`. Verify route-level code splitting still applies after the change. Tracked in STATE.md "Pending Todos".
+- 🔴 **High** — affects launch readiness, security, or live correctness
+- 🟡 **Medium** — fragile area, future-work hazard, or untested invariant
+- 🟢 **Low** — hygiene, dead code, minor refactor
 
-**`usePrefersReducedMotion()` branching duplicated across three reel routes:**
-- Issue: identical 3-line `const reduced = usePrefersReducedMotion(); if (reduced) return <ReducedMotionReel />; return <Reel />;` pattern in `PublicReelRoute.tsx:6`, `HandleReelRoute.tsx:10`, `AppReelRoute.tsx:13`.
-- Files: `src/routes/PublicReelRoute.tsx:3-7`, `src/routes/HandleReelRoute.tsx:5-11`, `src/routes/AppReelRoute.tsx:3-14`
-- Impact: low — three identical branches, no logic skew yet. Risk of skew once each route gets per-handle data inputs (Phase 9).
-- Fix approach: extract `<ReelView seed={...} />` shared component once each route has distinct data. 03-01 explicitly chose to defer this until Phase 9 ("when each side has different data inputs"). Hold for now; revisit after Phase 9.
+---
 
-**BottomNav-vs-ChapterRail collision uses `!important`:**
-- Issue: `src/index.css:96` has `bottom: calc(4rem + max(env(safe-area-inset-bottom), 32px)) !important` scoped to `.app-reel-host [data-chapter-rail]`. Required because `ChapterRail.tsx:35` sets `bottom` via inline `style={{ bottom: '...' }}` (inline > class specificity).
-- Files: `src/index.css:92-96`, `src/reel/ChapterRail.tsx:35`
-- Impact: works correctly; `!important` is scoped to the marker class so blast radius is one route subtree. Cosmetic / code-cleanliness only.
-- Fix approach: refactor `ChapterRail` to read `bottom` from a CSS custom property (e.g. `--chapter-rail-bottom: max(env(safe-area-inset-bottom), 32px)`), then `.app-reel-host` overrides the variable instead of the property. Removes `!important`. Plan 03-02 explicitly considered and rejected this as too invasive for a layout-shell plan; revisit when ChapterRail is touched for other reasons.
+## 🔴 Deploy & Operations
 
-## Brittle Patterns (Documented, Intentional)
+**VM file-system drift (load-bearing, fragile).** The deploy workflow now scp's `docker-compose.yml` + `docker-compose.prod.yml` to `/opt/timeline-revamp/` on every tag deploy (fixed UAT v0.2.1 after v0.1.0 + v0.2.0 silently deployed nothing). However, **other manually-installed files on the VM are still NOT synced by the workflow**:
+- `/opt/timeline-revamp/.env` (production secrets — set once, never auto-synced)
+- `/opt/timeline-revamp/ops/nginx/timeline.conf` (Phase 8 nginx config — also set once on the VM)
+- `/opt/timeline-revamp/.oci/timeline-revamp.pem` (OCI private key)
+- `infra/cloud-init.yaml` is repo-only and never re-applied unless the VM is re-tainted
 
-**DATA-02 deferrable unique constraint owned by hand-authored migration:**
-- Pattern: `cities (user_id, order_index)` UNIQUE constraint is `DEFERRABLE INITIALLY DEFERRED` and lives in `server/db/migrations/0001_cities_deferrable_unique.sql` — NOT declared in `server/db/schema.ts`.
-- Files: `server/db/schema.ts:1-17` (DATA-02 OWNERSHIP NOTICE block), `server/db/migrations/0001_cities_deferrable_unique.sql`
-- Why this is correct: Postgres forbids `CREATE UNIQUE INDEX` from being `DEFERRABLE`; only `ALTER TABLE … ADD CONSTRAINT … UNIQUE … DEFERRABLE` works. Drizzle Kit can only model unique INDEXes. If the constraint were declared via `uniqueIndex(...)` in schema.ts, every future `bun run db:generate` would diff against the live DB, see "no matching index," and silently re-introduce a non-deferrable index — breaking DATA-03's bulk reorder transaction.
-- Constraint on future work: future developers MUST NOT add a `uniqueIndex(table.userId, table.orderIndex)` (or equivalent) declaration to `server/db/schema.ts`. The OWNERSHIP NOTICE comment block at the top of schema.ts is the canonical reminder. CI/code review should treat any reintroduction of that index as a regression.
+**Risk:** if any of these need updating, the deploy will silently use the stale version. There's no drift detection. Suggested guardrail: a `scripts/verify-vm-files.sh` that diffs critical VM files against repo expectations, run as a smoke step.
 
-**Drizzle journal required hand-edit for migration 0001:**
-- Pattern: `server/db/migrations/meta/_journal.json:16` was hand-edited to register `0001_cities_deferrable_unique` (idx=1, version=7, breakpoints=true) because `drizzle-kit generate` only writes journal entries for migrations it produced itself.
-- Files: `server/db/migrations/meta/_journal.json`
-- Constraint: any future hand-authored SQL migration (e.g. for triggers, partial indexes, or other constraint types Drizzle can't model) needs the same hand-edit to `_journal.json`. Without it, `bun run db:migrate` silently skips the file. Auto-generated migrations from `db:generate` will keep advancing the journal correctly; mixed sequences are fine, but each hand-authored file must be appended manually.
+**OCI `.oci/` dir perms hotfix not codified.** UAT v0.2.3 surfaced and fixed (manually, via SSH) `chmod 711 /opt/timeline-revamp/.oci/` — the container's `app` user (uid 1001) couldn't traverse the dir (owned by uid 1000 `ubuntu`, mode 700) to open its own PEM. The fix is NOT in `infra/DEPLOY.md`, NOT in `infra/cloud-init.yaml`, NOT in Terraform. A fresh VM provision would replay the same EACCES bug. Action: add to DEPLOY.md Post-Provision SCP block; mention in cloud-init.yaml.
 
-**`@server/*` path alias resolves under TS + Vitest + Vite, but NOT under tsx runtime:**
-- Pattern: server-internal code uses relative imports (`./reservedWords.js`, `../env.js`); only frontend (`src/auth/HandlePickerModal.tsx`) and tests (`server/auth/jwt.test.ts`) use `@server/*`.
-- Files: `tsconfig.app.json` (`@server/*: ['./server/*']`), `vitest.config.ts` (`@server` alias), `vite.config.ts` (alias). The runtime tsx process resolves nothing.
-- Constraint: server code must keep using relative imports with explicit `.js` extensions. Documented in 04-01 and 04-02 SUMMARYs as auto-fixed deviations. If a future plan tells the executor to use `@server/*` inside `server/`, the API will boot-crash with `ERR_MODULE_NOT_FOUND`.
+**OCIR_AUTH_TOKEN rotation cadence undocumented.** Stored in GHA secrets; no policy on when/how to rotate. OCIR auth tokens expire per Oracle's policy.
 
-## Forward-Looking Concerns for Phase 5
+## 🔴 Security
 
-**Deferrable constraint gets its first real exercise:**
-- Phase 5's drag-reorder feature triggers `PATCH /api/cities/reorder` which performs a bulk UPDATE inside a single transaction. The `cities_user_id_order_index_unique` constraint being `DEFERRABLE INITIALLY DEFERRED` is what allows mid-transaction order_index swaps without intermediate uniqueness violations.
-- Files: `server/db/migrations/0001_cities_deferrable_unique.sql`, `server/db/schema.ts:1-17`
-- Risk: Phase 5 plan must explicitly cite the OWNERSHIP NOTICE and walk through the transaction pattern. If the executor wraps the update set in a non-transaction context, or uses `SET CONSTRAINTS ALL IMMEDIATE` accidentally, the bulk reorder will fail with constraint violations on the first swap.
-- Mitigation: STATE.md "Session Continuity" already flags this. The Phase 5 planner should reference DATA-02 explicitly and include a smoke test where the reorder swaps two adjacent rows.
+**OCI PEM mounted into container (Phase 8 F8 follow-up, deferred).** `server/oci/parClient.ts` reads `OCI_PRIVATE_KEY_PATH` at startup (currently `/app/.oci/timeline-revamp.pem`). Mounting a private key into a container is a known anti-pattern. **Instance Principal auth** (OCI VM identity) would eliminate the PEM-in-container risk entirely. Deferred from Phase 8 — still open.
 
-**BigDataCloud reverse-geocoding rate limits and key management:**
-- Phase 5 prereq: a BigDataCloud API key (or chosen provider) for click-on-map → city name lookup. Free tier limits unverified.
-- Files: not yet — will land in `.env.local` (likely as `VITE_BIGDATACLOUD_KEY` or proxied through the server to keep the key off the client).
-- Risk: rate-limit pattern, error-on-failure UX, and whether to proxy through Hono (to keep key server-side) all need to be decided in Phase 5 planning. Free-tier check before signing up.
+**Bucket access_type=ObjectRead (Phase 8 F5 Path B follow-up, deferred).** Photos are addressable by direct URL once you know the UUID-named object name (128 bits of unguessability). No listing protection, but a UUID-leak (e.g. via referer header in a logged outbound request) would permanently expose that photo. **Path B** mints short-TTL read PARs server-side per request — Phase 11+/Phase 12 hardening candidate.
 
-## Deferred to v2
+## 🟡 Test & Quality Debt
 
-These items are explicitly acknowledged in `.planning/STATE.md` ("Deferred Items") and re-listed here for continuity. Cross-reference STATE.md for the canonical list:
+**`server/routes/cities.test.ts` is 945 lines** (past the project's ~800-line soft ceiling). Natural splits documented in STATE.md:
+- `cities.read.test.ts` — GET tests
+- `cities.write.test.ts` — POST/PATCH/DELETE tests
+- `cities.reorder.test.ts` — PATCH /reorder + DEFERRABLE constraint test
+- `cities.test.helpers.ts` — shared fixtures (the largest savings)
 
-- Manual theme toggle UI (override of `prefers-color-scheme`) — deferred Phase 3, 4-step pickup plan recorded in `.planning/TODOS.md`.
-- Per-reel server-side poster generation (first-frame render at save time) — deferred Phase 9+.
-- Lighthouse mobile audit on `bun run preview` (LCP element verification, perf score ≥ 90, CLS ≤ 0.1) — Phase 2 deferred check, still not run.
-- Visual review of Phase 2 motion choreography (Apple-Weather pace check on Framer + tuned flyTo) — deferred to user.
-- Visual review of Phase 3 routes on iPhone (`/`, `/u/foo`, `/app/`, `/app/trips`, `/app/me`, OS dark/light toggle) — deferred to user.
-- Live expired-token rejection test using natural Auth0 TTL — not feasible in one weekend; AUTH-02 SC #4 is covered by `server/auth/jwt.test.ts` using in-memory keypair injection instead.
+**`PATCH /api/cities/reorder` pre-flight check is OUTSIDE the transaction.** The ownership + completeness check runs before `db.transaction(...)` opens. Narrow TOCTOU window: a concurrent `DELETE /api/cities/:id` between the pre-flight check and the transaction commit could leave a gap in the `0..n-1` `order_index` sequence. Fix: move the check inside the txn at the cost of holding the row-locks longer. Acceptable for v1; revisit if concurrency profile changes.
 
-## Resolved Since Previous Map
+**`PATCH /api/cities/:id` strictly-advances `updatedAt` test uses a 50ms sleep** for determinism. Replace with a backdated seed (`updatedAt = Date.now() - 1000` at fixture insert) for full determinism. Hygiene.
 
-Items closed out during Phases 2-4 (moved here from previous CONCERNS.md):
+## 🟡 Frontend Architecture Smells
 
-- **W1 MapLibre-in-main-chunk bundle bloat** — resolved Phase 2 via `manualChunks: { maplibre: ['maplibre-gl'] }` (`vite.config.ts:39-41`) and dynamic import of `MapCanvas`. MapLibre is now a separate ~283 KB gzip chunk. (Verified: `dist/assets/maplibre-wqmL2Hxp.js` 1.05 MB).
-- **Demotiles tile-source ceiling** — resolved Phase 2 via MapTiler `streets-v2-dark` (env-keyed `VITE_MAPTILER_KEY`), demotiles retained as fallback when key absent.
-- **Empty `src/motion/` directory** — resolved Phase 2; `src/motion/variants.ts` now houses the Framer Motion shared variants.
-- **No backend, no auth, no tests** — resolved across Phases 2-4: 88 vitest tests including in-memory JWT validation; full Hono + Drizzle + Postgres backend at `server/`; Auth0 wired into `/app/*` only.
-- **`StateBadge` ungated in production** — resolved Phase 2 plan 02-05; StateBadge now self-gates via `import.meta.env.PROD`.
-- **MapLibre lazy-CSS race** — resolved Phase 2 plan 02-07 hotfix; MapLibre's CSS imported eagerly in `src/main.tsx` instead of inside the lazy `MapCanvas` chunk, so the JS-runs-before-CSS race no longer occurs.
-- **Amber token drift between `index.css` and `tailwind.config.ts`** — resolved Phase 3 plan 03-03; both files now match `DESIGN.md:85-87` exactly (`#FFE4A0`, `#FFD470`, `#E8B040`). `grep -rniE "(F5B83A|C28A1E)" src/ tailwind.config.ts` returns zero matches.
-- **REQUIREMENTS.md AUTH-05..07 traceability typo** — resolved Phase 4 plan 04-02 Task 6; `.planning/REQUIREMENTS.md:152` now correctly maps AUTH-05..07 to Phase 4 (W4).
-- **Phase 1/2 known quirks** (auto-play wrap, world-view first frame, StrictMode dev double-mount, gesture state-machine pure-function lock, `touch-action: none` requirement, MapLibre `interactive: false` requirement, seeded-cities zoom values) — all stable through Phase 4. No further action needed unless behavior regresses.
+**Reel rendering branches are NOT shared via a `<ReelView />` abstraction.** `PublicReelRoute`, `HandleReelRoute`, and `AppReelRoute` each independently:
+- Call `usePrefersReducedMotion()`
+- Decide whether to render `Reel` / `ReducedMotionReel` / `OrbitReel` / `OrbitReducedMotionReel` / `GlobeReel` / `GlobeReducedMotionReel`
+- Pass chapters (seeded vs. fetched)
 
-## Things That Could Surprise A New Reader
+Triple-implementation; any new reel-selection rule must touch all three. Suggested refactor: `<ReelView chapters={...}>` that owns the branching.
 
-- **Public reel is intentionally always dark** (`DESIGN.md:72`). `--color-bg-map` is NOT in the light-mode override block in `src/index.css`. Reel surfaces stay dark even when OS is in light mode. Don't "fix" this.
-- **`AuthProvider` mounts inside `AppLayout`, not `main.tsx` or `App.tsx`** — AUTH-04 grep-enforced. The only files that may import `@auth0/auth0-react` are `src/auth/AuthProvider.tsx`, `src/auth/useApi.ts`, and `src/components/RequireAuth.tsx`. Importing it elsewhere (especially in any public route) breaks AUTH-04 and ships the SDK on the public reel.
-- **Dual env-var sets are by design**: `.env.local` carries both `AUTH0_*` (server reads) and `VITE_AUTH0_*` (frontend reads). SPAs ship `client_id` in JS bundles by definition; duplicating the value is not a secret leak.
-- **`src/components/RequireAuth.tsx`** is no longer a Phase-3 stub — Phase 4 replaced its body with the real Auth0 session check + `<Navigate to="/" />` redirect. Check the file before assuming any "stub" behavior.
-- **gstack docs are primary, repo `docs/` is a snapshot.** Edits to `docs/plan.md` won't propagate to gstack — edit the gstack source or sync afterward.
+**`SEEDED_CITIES` array length is implicit.** `src/data/seeded-cities.ts` exports 9 cities (UAT v0.2.0). Some components historically assumed `>= 1`; explicit length docs would help. Mostly under control; flag for awareness.
+
+**`SCRUB_TOTAL_CHAPTERS = 10` in `src/gestures/stateMachine.ts:51`** is a dead constant — no consumer reads it. Remove or wire it to `SEEDED_CITIES.length` for honesty.
+
+**`MapPicker.tsx mapReadyTick` side-effect counter** (Phase 5 carry-over). Increments to retrigger marker-sync effect after init. Replace with `useState(map)` so React re-renders on init naturally. Cosmetic; works correctly today.
+
+**`MapPicker.tsx` marker tear-down + recreate on every prop change.** No keyed diff. Acceptable for current ≤9 cities; revisit at 100+ cities (Phase 5 code review I-4).
+
+**`formatArrived` duplicated** in `src/components/CityList.tsx` + `src/reel/ChapterOverlay.tsx`. Extract to `src/utils/formatDate.ts`. Hygiene.
+
+## 🟡 Auth & Public-Surface Coupling
+
+**`/app?signup=1` query-param signal is fragile.** UAT v0.2.2 wired the "Make your own" CTA to `/app?signup=1`, which `RequireAuth` reads to pass `screen_hint: 'signup'` to Auth0. The contract is: public CTA href ↔ `RequireAuth` `URLSearchParams.has('signup')`. If anything else navigates to `/app?signup=1` (e.g., a typo in another CTA, a bookmark), the user gets the signup screen instead of login. **Not a security issue** (Auth0 still validates the user), but a usability footgun. Suggested: rename the param to something less generic, e.g. `?hint=signup`, and document in `AuthProvider.tsx` JSDoc.
+
+**`AUTH-04 grep-enforced public-surface seam** is enforced by code-search not type-checking. A future contributor importing `@auth0/auth0-react` from a public route would compile and run; the grep test catches it. Acceptable but consider augmenting with an ESLint rule (`no-restricted-imports` with `paths: [{ name: '@auth0/auth0-react', message: ... }]` filtered by file pattern).
+
+## 🟢 Bundle & Performance
+
+**No Lighthouse mobile audit since Phase 2.** Targets: LCP element identified, perf ≥ 90, CLS ≤ 0.1. Phase 11 scope.
+
+**`framer-motion` is in the main bundle**, not its own chunk. Phase 2 deferred this as "optional unless Lighthouse flags it." Phase 11 will check.
+
+**`@auth0/auth0-react` chunk gating verification.** AUTH-04 says the auth0 chunk loads only on `/app/*`. Build the prod bundle and grep `dist/assets/index-*.js` for `loginWithRedirect` — should be ABSENT (it should live only in the `@auth0_auth0-react`-prefixed chunk). Drift check.
+
+**`maplibre-gl` is in its own chunk** (`vite.config.ts` `manualChunks: { maplibre: ['maplibre-gl'] }`) — verified Phase 2, ~283 KB gzip. The chunk loads after LCP via React.lazy on `MapCanvas`.
+
+## 🟢 Accessibility
+
+**No formal a11y audit has been run.** Phase 11 scope. Specific items:
+- Keyboard-nav coverage across `/app/*` (Trips reorder dnd-kit handles, CityForm, PhotoUploader).
+- Focus management: `HandlePickerModal`, `PhotoDetailSheet`, `PhotoViewer` (focus trap + restore).
+- Screen-reader announcement coverage. `Reel.tsx` has an `aria-live="polite"` region announcing chapter changes; broader sweep for trip CRUD + photo upload status needed.
+- `PlayPauseIndicator` (UAT v0.2.0): `role="status"` + `aria-label="Reel paused"` on the persistent layer; transient toggle layer is `aria-hidden`. Reconfirm whether the persistent layer should also be visible to screen readers.
+- ARIA-label correctness on drag handles (`<button aria-label="Reorder">` in CityList).
+
+## 🟢 Mobile-UAT Deferred Items
+
+**Instrumented iPhone Web Inspector FPS measurement** for `OrbitReel` 60°/s orbit (Phase 7 HUMAN-UAT item #1). Visual pass was achieved during Phase 8 deploy smoke; the instrumented measurement (USB-tether + Web Inspector → Rendering → Frame Rendering Stats) was deferred to "Phase 12 polish." Better fit for Phase 11 (mobile polish + a11y branch) given the focus.
+
+## 🟢 Documentation & Doc-Code Drift
+
+**Phase 4 callback URL whitelist guide drift.** Plan 04-02 instructed the operator to whitelist `http://localhost:5173` as Allowed Callback URL in Auth0, but the SDK code at `src/auth/AuthProvider.tsx:29` sends `${origin}/app`. User had to extend the dashboard whitelist after first run. Patch: either fix `AuthProvider.tsx` to use origin-only or update the plan/SUMMARY. Doc-only fix.
+
+**`infra/cloud-init.yaml` has 4 known bugs (Phase 8 F1)** that only matter if a fresh VM is re-tainted + re-applied via Terraform. Rare path; documented in Phase 8 03-SUMMARY. Suggested fold-in to Phase 8.1.1 if/when it lands.
+
+## 🟢 Dead Code & Imports
+
+**`SCRUB_TOTAL_CHAPTERS`** in `src/gestures/stateMachine.ts:51` — exported, unread. Remove or wire to `SEEDED_CITIES.length`.
+
+**`tsx` in `devDependencies`** is no longer used by `db:migrate` (UAT phase 8 swapped to `bun run`). May still be used by `scripts/dev.ts`; audit before removing.
+
+## 🟢 Test Hygiene Targets
+
+**Extract `cities.test.helpers.ts`** to drive `cities.test.ts` under the 800-line ceiling.
+
+**Make the OCI `.oci/` PEM perms a unit-testable invariant** somewhere — currently it's a manual deploy concern. Suggested: `infra/DEPLOY.md` Post-Provision section with copy-pasteable verification command.
+
+---
+
+## Quick-Reference: Open Phase Follow-Ups (cross-ref to phase SUMMARYs)
+
+| Source | Item | Severity |
+|---|---|---|
+| Phase 8 F1 | 4 cloud-init bugs (rare path) | 🟢 |
+| Phase 8 F1 | Document UID-1001 + dir-perm step in DEPLOY.md | 🔴 (silent recurrence risk) |
+| Phase 8 F5 Path B | Mint read PARs vs ObjectRead bucket | 🔴 (security hardening) |
+| Phase 8 F8 | HandlePickerModal Claim button starts dimmed — pre-fill suggestion | 🟢 (Phase 11) |
+| Phase 8 F8 | parClient.ts → Instance Principal auth | 🔴 (eliminates PEM mount) |
+| Phase 5 housekeeping | Split `cities.test.ts` (945 lines) | 🟡 |
+| Phase 5 housekeeping | Reorder pre-flight inside txn | 🟡 |
+| Phase 5 housekeeping | `mapReadyTick` → `useState(map)` | 🟢 |
+| Phase 5 housekeeping | Marker `Map<cityId, Marker>` diff (defer to 100+ cities) | 🟢 |
+| Phase 5 housekeeping | Extract `formatArrived` to `src/utils/` | 🟢 |
+| Phase 5 housekeeping | Deterministic `updatedAt` seed | 🟢 |
+
+These flow into Phase 11/12 planning as input.
