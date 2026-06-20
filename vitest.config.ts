@@ -15,6 +15,7 @@ export default defineConfig({
     // Server tests and pure-Node tests stay in the default node environment.
     environment: 'node',
     globals: true,
+    setupFiles: ['./test/setup.ts'],
     include: [
       'src/**/*.test.ts',
       'src/**/*.test.tsx',

@@ -13,7 +13,11 @@ export interface OrbitReducedMotionReelProps {
 
 export function OrbitReducedMotionReel({ city, photos }: OrbitReducedMotionReelProps) {
   return (
-    <main className="reel-static-root bg-bg text-ink min-h-dvh">
+    <section
+      className="reel-static-root bg-bg text-ink min-h-dvh"
+      role="region"
+      aria-label="Single city travel reel (reduced motion)"
+    >
       <header className="p-6 space-y-2">
         <h1 className="text-display text-2xl">{city.name}</h1>
         {city.caption && <p className="text-ink-mute">{city.caption}</p>}
@@ -28,6 +32,6 @@ export function OrbitReducedMotionReel({ city, photos }: OrbitReducedMotionReelP
         </ul>
       )}
       <CTAPill />
-    </main>
+    </section>
   );
 }

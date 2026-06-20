@@ -85,6 +85,24 @@ const mockCity: CityDTO = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockUsePhotosQuery.mockReturnValue({ data: undefined, error: null, refetch: vi.fn() });
+  // jsdom does not implement HTMLDialogElement.showModal; polyfill it so the
+  // native <dialog>-based PhotoDetailSheet renders with [open] set.
+  if (!('showModal' in HTMLDialogElement.prototype)) {
+    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+      configurable: true,
+      writable: true,
+      value: function (this: HTMLDialogElement) {
+        this.setAttribute('open', '');
+      },
+    });
+    Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+      configurable: true,
+      writable: true,
+      value: function (this: HTMLDialogElement) {
+        this.removeAttribute('open');
+      },
+    });
+  }
 });
 
 describe('PhotoDetailSheet', () => {
@@ -108,7 +126,10 @@ describe('PhotoDetailSheet', () => {
   it('pressing Escape calls onClose', () => {
     const onClose = vi.fn();
     render(<PhotoDetailSheet city={mockCity} onClose={onClose} />);
-    fireEvent.keyDown(window, { key: 'Escape' });
+    // A11Y-06 (Phase 11): listener now lives on document in capture phase
+    // (close-watcher anti-modal-trap pattern). Dispatch on document so the
+    // capture-phase handler fires.
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

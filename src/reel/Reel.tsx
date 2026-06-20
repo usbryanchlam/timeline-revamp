@@ -56,14 +56,19 @@ export function Reel({ chapters = SEEDED_CITIES }: ReelProps = {}) {
     // map (interactive: false). We'll wire camera-ownership signals in W2.
   }, []);
 
-  // Aria-live announcement on chapter change.
+  // Aria-live announcement on arrival-pulse beat. A11Y-04: only fire when
+  // the camera has landed (state.name === 'IDLE' or 'PAUSED'), never
+  // mid-flight (CHAPTER_SWIPE / SCRUBBING / MAP_INTERACT). Screen readers
+  // get the announcement once the city is on-screen and the user can
+  // actually act on it.
   const liveRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
+    if (state.name !== 'IDLE' && state.name !== 'PAUSED') return;
     const c = chapters[state.chapterIndex];
     if (c && liveRef.current) {
       liveRef.current.textContent = `${c.name}, ${formatMonthYear(c.arrivedAt)}`;
     }
-  }, [state.chapterIndex, chapters]);
+  }, [state.name, state.chapterIndex, chapters]);
 
   const chapter = chapters[state.chapterIndex];
   if (!chapter) return null;

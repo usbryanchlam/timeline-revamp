@@ -186,4 +186,39 @@ describe('PhotoCycle', () => {
     const img = screen.getByRole('img');
     expect(img.getAttribute('style')).toContain('transition: none');
   });
+
+  // A11Y-05 — alt strictly derives from caption with empty-string fallback
+  it('A11Y-05: img alt equals the photo.alt (caption) when provided', () => {
+    mockUsePrefersReducedMotion.mockReturnValue(false);
+    const photo: PhotoCard = {
+      id: 'k1',
+      masterUrl: 'https://oci.test/master/k1.jpg',
+      thumbUrl: 'https://oci.test/thumb/k1.jpg',
+      alt: 'Cherry blossoms in Kyoto',
+      orderIndex: 0,
+    };
+    render(<PhotoCycle photos={[photo]} />);
+    const img = screen.getByRole('img');
+    expect(img.getAttribute('alt')).toBe('Cherry blossoms in Kyoto');
+  });
+
+  it('A11Y-05: img alt is empty string when caption (photo.alt) is missing', () => {
+    mockUsePrefersReducedMotion.mockReturnValue(false);
+    const photo: PhotoCard = {
+      id: 'k2',
+      masterUrl: 'https://oci.test/master/k2.jpg',
+      thumbUrl: 'https://oci.test/thumb/k2.jpg',
+      // Use empty string to model "no caption" — alt must not become the
+      // literal string "undefined" or fall back to a placeholder.
+      alt: '',
+      orderIndex: 0,
+    };
+    const { container } = render(<PhotoCycle photos={[photo]} />);
+    // alt="" makes the img presentational (no implicit role=img), so query
+    // by selector rather than getByRole. The element must still exist with
+    // an explicit empty-string alt attribute.
+    const imgs = container.querySelectorAll('img');
+    expect(imgs.length).toBeGreaterThan(0);
+    expect(imgs[0]!.getAttribute('alt')).toBe('');
+  });
 });

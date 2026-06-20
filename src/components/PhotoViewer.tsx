@@ -1,5 +1,11 @@
 // PhotoViewer — full-screen single-photo viewer for a city's photos.
 //
+// Phase 11 / A11Y-06: Converted from a div role="dialog" wrapper to a
+// native <dialog>. Esc dismissal uses the close-watcher anti-modal-trap
+// pattern (cancel preventDefault + document-level keydown in capture
+// phase), mirroring HandlePickerModal and PhotoDetailSheet. Memory
+// reference: ~/.claude/projects/.../memory/feedback_dialog_double_esc.md
+//
 // Phase 6 scope (LOCKED in CONTEXT.md decisions, NOT deferred):
 //   - Full-viewport modal on mobile + desktop; dark backdrop
 //   - Master image displayed; thumb image used as instant placeholder while master loads
@@ -49,8 +55,8 @@ export function PhotoViewer({
 
   const mountedRef = useRef(true);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
   const pointerStartRef = useRef<{ x: number; y: number; id: number } | null>(null);
 
   // StrictMode-safe mount + focus capture/return.
@@ -67,6 +73,29 @@ export function PhotoViewer({
     };
   }, []);
 
+  // Native <dialog> open + close-watcher anti-modal-trap.
+  // Memory: feedback_dialog_double_esc.md — Esc must NOT double-dismiss.
+  useEffect(() => {
+    const d = dialogRef.current;
+    if (!d) return;
+    if (!d.open) d.showModal();
+    const onCancel = (e: Event) => e.preventDefault();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && d.open) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    d.addEventListener('cancel', onCancel);
+    document.addEventListener('keydown', onKeyDown, /* capture */ true);
+    return () => {
+      d.removeEventListener('cancel', onCancel);
+      document.removeEventListener('keydown', onKeyDown, true);
+      if (d.open) d.close();
+    };
+  }, [onClose]);
+
   // prefers-reduced-motion detection
   const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
@@ -82,20 +111,19 @@ export function PhotoViewer({
     setMasterLoaded(false);
   }, [index]);
 
-  // Keyboard navigation
+  // Arrow navigation (keydown on document — same phase as dialog Esc handler
+  // so the arrow keys work while the dialog has focus).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      } else if (e.key === 'ArrowRight') {
+      if (e.key === 'ArrowRight') {
         setIndex((i) => Math.min(photos.length - 1, i + 1));
       } else if (e.key === 'ArrowLeft') {
         setIndex((i) => Math.max(0, i - 1));
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, photos.length]);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [photos.length]);
 
   // Swipe (pointer events; no library)
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -147,13 +175,21 @@ export function PhotoViewer({
   if (!photo) return null;
 
   return (
-    <div
-      ref={rootRef}
-      role="dialog"
+    <dialog
+      ref={dialogRef}
       aria-modal="true"
       aria-label="Photo viewer"
-      onClick={() => onClose()}
-      className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
+      onClick={(e) => {
+        // Backdrop tap closes (target === currentTarget means click landed on
+        // the dialog element itself, not on bubbled inner content).
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="
+        fixed inset-0 z-[60] m-0 p-0 max-w-none max-h-none w-screen h-screen
+        bg-black/90 text-ink
+        backdrop:bg-black/90
+        flex items-center justify-center
+      "
     >
       {/* Toolbar */}
       <div
@@ -263,6 +299,6 @@ export function PhotoViewer({
           ))}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
