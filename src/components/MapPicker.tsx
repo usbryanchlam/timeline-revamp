@@ -238,7 +238,45 @@ export function MapPicker({ cities, draftPin, onPick, onCityClick }: MapPickerPr
     };
   }, []);
 
-  return <div ref={containerRef} className="absolute inset-0 bg-bg-map" />;
+  // A11Y-02: keyboard pin-drop affordance. The map canvas is a pointer-only
+  // surface; without this button, keyboard users could not drop a draft pin
+  // and the "add a city" flow would be impossible without a mouse. The button
+  // calls onPick with whatever the map's current visible center is — a
+  // ballpark approximation of "where the user is looking" — and the same
+  // CityForm flow follows. The button is visually-hidden until focused (so it
+  // does not disturb the visual layout) and uses an amber focus ring to
+  // honour the single-accent rule in DESIGN.md.
+  const onKeyboardPick = () => {
+    const map = mapRef.current as unknown as
+      | { readonly getCenter?: () => { lat: number; lng: number } }
+      | null;
+    // MapLibre exposes getCenter(); our minimal type didn't include it, so we
+    // narrow with a runtime guard. If the map isn't ready yet, no-op silently
+    // (the button only renders after the map mounts, but Strict-Mode timing
+    // could put us here mid-init).
+    const center = map?.getCenter?.();
+    if (!center) return;
+    onPick(center.lat, center.lng);
+  };
+
+  return (
+    <div ref={containerRef} className="absolute inset-0 bg-bg-map">
+      <button
+        type="button"
+        onClick={onKeyboardPick}
+        aria-label="Add city at current map center"
+        className="
+          sr-only focus-visible:not-sr-only
+          focus-visible:absolute focus-visible:top-2 focus-visible:left-2 focus-visible:z-10
+          focus-visible:px-3 focus-visible:py-2 focus-visible:rounded-md
+          focus-visible:bg-bg-elev focus-visible:text-ink focus-visible:border focus-visible:border-line
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500
+        "
+      >
+        Add city at current map center
+      </button>
+    </div>
+  );
 }
 
 function computeBounds(

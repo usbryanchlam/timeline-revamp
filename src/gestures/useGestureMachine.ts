@@ -30,6 +30,15 @@ interface Options {
   readonly totalChapters: number;
   /** ms a chapter dwells in IDLE auto-play before advancing. */
   readonly autoPlayDwellMs?: number;
+  /**
+   * A11Y-08: Enter key opens the photo detail sheet. The state machine does
+   * not own detail-sheet state — this callback is invoked by the keyboard
+   * handler so the Reel component can open the sheet via its own state. The
+   * matching no-op OPEN_DETAIL event is still dispatched into the state
+   * machine for event-union completeness (downstream consumers may observe
+   * the dispatch via a custom middleware).
+   */
+  readonly onOpenDetail?: () => void;
 }
 
 interface Result {
@@ -56,6 +65,7 @@ interface Result {
 export function useGestureMachine({
   totalChapters,
   autoPlayDwellMs = AUTOPLAY_DWELL_MS,
+  onOpenDetail,
 }: Options): Result {
   const [state, baseDispatch] = useReducer(
     (s: ReelState, e: ReelEvent) => transition(s, e, totalChapters),
@@ -74,6 +84,14 @@ export function useGestureMachine({
   // Latest state for use inside imperative event handlers without re-binding.
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // Latest onOpenDetail callback. Held in a ref so the keydown listener does
+  // not need to re-register every time the consumer passes a new function
+  // identity (typical when the consumer is a function component without
+  // useCallback). The Reel component owns the photo detail sheet's open
+  // state; this ref lets the listener invoke the consumer's latest handler.
+  const onOpenDetailRef = useRef(onOpenDetail);
+  onOpenDetailRef.current = onOpenDetail;
 
   const clear = (ref: React.MutableRefObject<number | null>) => {
     if (ref.current !== null) {
@@ -270,6 +288,14 @@ export function useGestureMachine({
         dispatch({ type: 'JUMP_CHAPTER', delta: -1 });
       } else if (e.key === 'ArrowDown') {
         dispatch({ type: 'JUMP_CHAPTER', delta: 1 });
+      } else if (e.key === 'Enter') {
+        // A11Y-08: Enter opens the photo detail sheet. We dispatch the no-op
+        // OPEN_DETAIL event for event-union completeness AND invoke the
+        // consumer's onOpenDetail callback (the Reel component owns the
+        // sheet's open state). If no callback was provided, the dispatch is
+        // a silent no-op — keyboard users hit Enter, nothing breaks.
+        dispatch({ type: 'OPEN_DETAIL' });
+        onOpenDetailRef.current?.();
       }
     };
 

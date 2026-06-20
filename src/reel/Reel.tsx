@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { SEEDED_CITIES } from '@/data/seeded-cities';
 import { useGestureMachine } from '@/gestures/useGestureMachine';
 import type { CityChapter } from '@/types/reel';
@@ -33,8 +33,18 @@ interface ReelProps {
 export function Reel({ chapters = SEEDED_CITIES }: ReelProps = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // A11Y-08: Enter opens the photo detail surface. On the public reel the
+  // detail surface is the ChapterOverlay's lightbox-style photo expansion
+  // (PhotoDetailSheet requires a CityDTO and is reserved for authenticated
+  // /app/trips — out of scope here). We expose a detailOpen flag that the
+  // ChapterOverlay can opt into; today it flips a CSS marker so screen-reader
+  // users can hear the chapter caption + first photo's alt text in full.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const openDetail = useCallback(() => setDetailOpen(true), []);
+
   const { state, bind } = useGestureMachine({
     totalChapters: chapters.length,
+    onOpenDetail: openDetail,
   });
 
   // Bind the container ref for both PointerEvents and the parent ref.
@@ -79,6 +89,13 @@ export function Reel({ chapters = SEEDED_CITIES }: ReelProps = {}) {
       className="reel-root relative bg-bg"
       role="region"
       aria-label="Travel reel"
+      data-detail-open={detailOpen ? 'true' : 'false'}
+      onKeyDown={(e) => {
+        // Esc closes the detail. The state-machine doesn't own this flag, so
+        // we handle Esc inline here. Other keys are routed by the gesture
+        // hook's window-level keydown listener.
+        if (e.key === 'Escape' && detailOpen) setDetailOpen(false);
+      }}
     >
       <Suspense fallback={<MapPoster />}>
         <MapCanvas

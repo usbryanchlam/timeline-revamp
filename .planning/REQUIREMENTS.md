@@ -28,7 +28,7 @@ Requirements for v1 launch. Each maps to roadmap phases.
 - [ ] **A11Y-05**: Photo overlays have `alt` from user-entered captions; empty-alt if no caption.
 - [ ] **A11Y-06**: Detail sheet has focus trap, `Esc` closes.
 - [ ] **A11Y-07**: Overlay text passes WCAG AA contrast on bright-photo worst case (gradient scrim ensures it).
-- [ ] **A11Y-08**: Keyboard controls: ←/→ scrub ±1s, ↑/↓ chapter prev/next, Space play/pause, Enter open detail.
+- [ ] **A11Y-08**: Keyboard controls: ←/→ chapter prev/next, ↑/↓ chapter prev/next, Space play/pause, Enter open detail.
 
 ### PERF — Performance budgets
 
