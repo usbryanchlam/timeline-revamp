@@ -1,12 +1,14 @@
 // PhotoDetailSheet — bottom sheet (mobile) / centered modal (md+) for a
 // city's photos. Mirrors CityForm.tsx's responsive layout pattern.
 //
-// Phase 6 scope:
-//   - Read-only display of caption (caption EDIT deferred per CONTEXT.md)
-//   - Grid of thumbnails (PhotoGrid)
-//   - PhotoUploader for adding new photos
-//   - Tap a thumbnail → open PhotoViewer at that index
-//   - Per-photo delete lives INSIDE PhotoViewer (this plan, task 4)
+// Phase 11 / A11Y-06: Converted from a div role="dialog" wrapper to a native
+// <dialog> opened via showModal(). The browser provides the focus trap +
+// backdrop natively. Esc dismissal uses the close-watcher anti-modal-trap
+// pattern (see ~/.claude/projects/.../memory/feedback_dialog_double_esc.md
+// and src/auth/HandlePickerModal.tsx as the reference implementation):
+//   1. cancel event preventDefault'd → blocks browser's first close request
+//   2. document-level keydown in CAPTURE phase → wins the race against
+//      Chromium's close-watcher logic and routes Esc to our onClose handler
 
 import { useEffect, useRef, useState } from 'react';
 import type { CityDTO } from '@/types/city';
@@ -23,6 +25,7 @@ interface PhotoDetailSheetProps {
 
 export function PhotoDetailSheet({ city, onClose }: PhotoDetailSheetProps) {
   const mountedRef = useRef(true);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -41,13 +44,27 @@ export function PhotoDetailSheet({ city, onClose }: PhotoDetailSheetProps) {
     };
   }, []);
 
-  // Escape-to-close
+  // Native <dialog> open + close-watcher anti-modal-trap (memory:
+  // feedback_dialog_double_esc.md). Mirrors HandlePickerModal exactly.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const d = dialogRef.current;
+    if (!d) return;
+    if (!d.open) d.showModal();
+    const onCancel = (e: Event) => e.preventDefault();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && d.open) {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    d.addEventListener('cancel', onCancel);
+    document.addEventListener('keydown', onKeyDown, /* capture */ true);
+    return () => {
+      d.removeEventListener('cancel', onCancel);
+      document.removeEventListener('keydown', onKeyDown, true);
+      if (d.open) d.close();
+    };
   }, [onClose]);
 
   const { data, error, refetch } = usePhotosQuery(city.id);
@@ -68,16 +85,26 @@ export function PhotoDetailSheet({ city, onClose }: PhotoDetailSheetProps) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40"
-      onClick={() => onClose()}
-      role="presentation"
+    <dialog
+      ref={dialogRef}
+      aria-modal="true"
+      aria-label={`Photos for ${city.name}`}
+      // Click on the backdrop region closes; the inner content stops
+      // propagation so taps on the sheet body do not dismiss.
+      onClick={(e) => {
+        // The native dialog backdrop is exposed as the dialog element itself
+        // for click events (target === currentTarget when the user clicks the
+        // backdrop area). Inner content uses stopPropagation below.
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="
+        fixed inset-0 z-50 m-0 p-0 max-w-none max-h-none w-screen h-screen
+        bg-transparent
+        backdrop:bg-black/40
+      "
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Photos for ${city.name}`}
         className="
           fixed inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto
           rounded-t-3xl bg-bg-elev border border-line p-6 space-y-4
@@ -132,6 +159,6 @@ export function PhotoDetailSheet({ city, onClose }: PhotoDetailSheetProps) {
           onPhotoDeleted={handlePhotoDeleted}
         />
       )}
-    </div>
+    </dialog>
   );
 }

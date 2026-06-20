@@ -69,6 +69,24 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockMatchMedia(false);
+  // jsdom lacks HTMLDialogElement.showModal — polyfill for the native
+  // <dialog>-based PhotoViewer (A11Y-06 conversion).
+  if (!('showModal' in HTMLDialogElement.prototype)) {
+    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+      configurable: true,
+      writable: true,
+      value: function (this: HTMLDialogElement) {
+        this.setAttribute('open', '');
+      },
+    });
+    Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+      configurable: true,
+      writable: true,
+      value: function (this: HTMLDialogElement) {
+        this.removeAttribute('open');
+      },
+    });
+  }
 });
 
 describe('PhotoViewer', () => {
@@ -89,23 +107,22 @@ describe('PhotoViewer', () => {
     render(<PhotoViewer {...defaultProps} initialIndex={0} />);
     const masterImg = screen.getByTestId('photo-viewer-master');
 
-    // Advance to index 1
-    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    // Arrow handler moved to document-level (Phase 11 native <dialog>).
+    fireEvent.keyDown(document, { key: 'ArrowRight' });
     expect(masterImg.getAttribute('src')).toBe(mockPhotos[1].masterUrl);
 
-    // Go back to index 0
-    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    fireEvent.keyDown(document, { key: 'ArrowLeft' });
     expect(masterImg.getAttribute('src')).toBe(mockPhotos[0].masterUrl);
 
-    // Clamp at start
-    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    fireEvent.keyDown(document, { key: 'ArrowLeft' });
     expect(masterImg.getAttribute('src')).toBe(mockPhotos[0].masterUrl);
   });
 
   it('pressing Escape calls onClose', () => {
     const onClose = vi.fn();
     render(<PhotoViewer {...defaultProps} onClose={onClose} />);
-    fireEvent.keyDown(window, { key: 'Escape' });
+    // A11Y-06: listener now on document in capture phase (close-watcher fix).
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
