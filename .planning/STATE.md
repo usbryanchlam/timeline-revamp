@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: complete
-stopped_at: iPhone UAT round closed at v0.2.4 (5 patch releases); Phase 10 (MP4) remains on hold; next is Phase 11 mobile polish + a11y branch
-last_updated: "2026-06-19T00:00:00.000Z"
-last_activity: 2026-06-19 -- v0.2.4 live; UAT round closed; Phase 11 mobile polish + a11y next
+status: executing
+stopped_at: v0.2.4 live; UAT round closed; Phase 11 mobile polish + a11y branch chosen as next
+last_updated: "2026-06-20T04:54:45.070Z"
+last_activity: 2026-06-20 -- Phase 11 execution started
 progress:
   total_phases: 13
   completed_phases: 8
-  total_plans: 29
+  total_plans: 32
   completed_plans: 24
-  percent: 83
+  percent: 75
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 09 complete + live-verified; iPhone UAT round closed at v0.2.4 (5 patch releases on top of v0.1.0). Next: Phase 11 mobile polish + a11y audit branch (Phase 10 MP4 remains on hold per user).
+**Current focus:** Phase 11 — mp4-rung-2-3-or-mobile-polish-a11y-audit
 
 ## Current Position
 
-Phase: 09 (deploy-part-2-empty-error-states) — VERIFIED (live, v0.2.4)
-Plan: 3 of 3 complete; SUMMARY + VERIFICATION committed; 5 UAT patches landed post-Phase-9 closure (v0.2.0–v0.2.4)
-Status: Phase 09 shipped end-to-end (v0.1.0 → GHA verify+build+SSH deploy+health-check live 2026-06-04). iPhone UAT round 2026-06-06 → 2026-06-19 produced 5 patch releases (see UAT Round table below). Phase 10 (MP4) remains on hold; next is Phase 11 mobile polish + a11y audit branch.
-Last activity: 2026-06-19 -- v0.2.4 live on Node-24 actions; UAT round closed; Phase 11 next
+Phase: 11 (mp4-rung-2-3-or-mobile-polish-a11y-audit) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 11
+Last activity: 2026-06-20 -- Phase 11 execution started
 
 Progress: [████████░░░░] 67% (8 of 12 phases complete)
 
@@ -194,6 +194,7 @@ Stopped at: v0.2.4 live; UAT round closed; Phase 11 mobile polish + a11y branch 
 **Next action**: Plan Phase 11 — the "mobile polish + a11y audit" branch of the Phase 11 fork (Phase 10 MP4 stays on hold). High-leverage right after this UAT round because the mobile-polish signal is freshest in memory. ROADMAP goal: round out iPhone gestures + visual polish + a11y for v1.0.0 launch.
 
 Open items that intersect Phase 11 (worth triaging into the plan):
+
 - 3 deferred-from-Phase-7 mobile UAT items: iPhone 60FPS orbit sustain, iOS globe projection rendering, mixed-case URL resolution on the deployed stack.
 - Phase 8 findings F1–F8 (post-deploy follow-ups) — many may already be addressed by this UAT round; needs a pass.
 - Pending todos (above): Lighthouse mobile audit on `bun run preview`, framer-motion chunking, visual reviews of Phase 2 motion + Phase 3 routes on iPhone, Phase 5 housekeeping carry-overs (cities.test.ts split, formatArrived extract, mapReadyTick refactor, marker diffing).
