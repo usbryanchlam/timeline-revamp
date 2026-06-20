@@ -46,7 +46,13 @@ export type ReelEvent =
   | { type: 'ORIENTATION_SETTLE' }
   // Programmatic / keyboard
   | { type: 'JUMP_CHAPTER'; delta: number }
-  | { type: 'TOGGLE_PAUSED' };
+  | { type: 'TOGGLE_PAUSED' }
+  // A11Y-08: Enter keyboard opens the photo detail sheet. The state machine
+  // does not own detail-sheet state (the Reel component does), so this event
+  // is a no-op in the reducer — its purpose is to keep the discriminated event
+  // union exhaustive AND give the consumer hook a place to fan out via the
+  // onOpenDetail callback. Handler is in useGestureMachine.ts keydown wiring.
+  | { type: 'OPEN_DETAIL' };
 
 export const SCRUB_TOTAL_CHAPTERS = 10 as const;
 export const FLICK_THRESHOLD_PX = 30 as const;
@@ -323,6 +329,15 @@ export function transition(
     case 'TOGGLE_PAUSED': {
       if (state.name === 'IDLE') return { ...state, name: 'PAUSED' };
       if (state.name === 'PAUSED') return { ...state, name: 'IDLE' };
+      return state;
+    }
+
+    case 'OPEN_DETAIL': {
+      // A11Y-08: Enter is dispatched here for event-union completeness, but the
+      // detail-sheet open is side-channeled via the useGestureMachine
+      // onOpenDetail callback (the Reel component owns the sheet). This is an
+      // identity return — the existing state ref must be reused so downstream
+      // referential-equality checks (React.memo / useEffect deps) do not fire.
       return state;
     }
   }

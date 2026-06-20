@@ -845,6 +845,44 @@ describe('TOGGLE_PAUSED', () => {
   });
 });
 
+describe('OPEN_DETAIL', () => {
+  // OPEN_DETAIL is dispatched by the keyboard handler on Enter (A11Y-08).
+  // The state machine treats it as a side-channel signal: it does NOT change
+  // any reel state. The Reel component (via the useGestureMachine onOpenDetail
+  // callback) is responsible for opening the photo detail sheet. This test
+  // asserts the event type is part of the discriminated union AND that it
+  // produces a no-op in all states (no accidental state corruption).
+  it('IDLE → IDLE (no-op identity)', () => {
+    const s = withState({ name: 'IDLE', chapterIndex: 3 });
+    const next = transition(s, { type: 'OPEN_DETAIL' }, TOTAL);
+    expect(next).toBe(s);
+  });
+
+  it('PAUSED → PAUSED (no-op identity)', () => {
+    const s = withState({ name: 'PAUSED', chapterIndex: 2 });
+    const next = transition(s, { type: 'OPEN_DETAIL' }, TOTAL);
+    expect(next).toBe(s);
+  });
+
+  it('CHAPTER_SWIPE → CHAPTER_SWIPE (no-op)', () => {
+    const s = withState({ name: 'CHAPTER_SWIPE', chapterIndex: 1 });
+    const next = transition(s, { type: 'OPEN_DETAIL' }, TOTAL);
+    expect(next).toBe(s);
+  });
+
+  it('SCRUBBING → SCRUBBING (no-op)', () => {
+    const s = withState({ name: 'SCRUBBING' });
+    const next = transition(s, { type: 'OPEN_DETAIL' }, TOTAL);
+    expect(next).toBe(s);
+  });
+
+  it('SUSPENDED → SUSPENDED (no-op, even though SUSPENDED ignores other events)', () => {
+    const s = withState({ name: 'SUSPENDED' });
+    const next = transition(s, { type: 'OPEN_DETAIL' }, TOTAL);
+    expect(next).toBe(s);
+  });
+});
+
 describe('immutability', () => {
   it('transition does not mutate input state', () => {
     const s = withState({ name: 'IDLE', chapterIndex: 2 });
