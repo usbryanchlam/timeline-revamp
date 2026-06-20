@@ -21,7 +21,11 @@ export function ReducedMotionReel({
   chapters = SEEDED_CITIES,
 }: ReducedMotionReelProps = {}) {
   return (
-    <main className="reel-static-root bg-bg text-ink">
+    <section
+      className="reel-static-root bg-bg text-ink"
+      role="region"
+      aria-label="Travel reel (reduced motion)"
+    >
       <header className="px-5 pt-12 pb-6 max-w-screen-sm mx-auto">
         <p className="text-caps text-[10px] text-amber-400 mb-2">Timeline</p>
         <h1 className="text-display text-[clamp(36px,9vw,56px)]">Travels, in chapters.</h1>
@@ -94,6 +98,6 @@ export function ReducedMotionReel({
           Make your own →
         </a>
       </footer>
-    </main>
+    </section>
   );
 }
