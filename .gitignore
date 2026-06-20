@@ -10,6 +10,10 @@ build/
 out/
 *.tsbuildinfo
 
+# Playwright generated artifacts (per-run results, HTML reports, traces)
+test-results/
+playwright-report/
+
 # Env
 .env
 .env.*
