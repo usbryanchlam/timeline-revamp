@@ -21,14 +21,14 @@ Requirements for v1 launch. Each maps to roadmap phases.
 
 ### A11Y — Accessibility
 
-- [ ] **A11Y-01**: Reduced-motion path passes axe-core with 0 violations.
-- [ ] **A11Y-02**: Keyboard-only path completes "add a city" flow without a mouse.
-- [ ] **A11Y-03**: Reel container is `role="region"` with `aria-label` (not `application` — known footgun).
-- [ ] **A11Y-04**: Chapter transitions fire `aria-live="polite"` announcement ("Kyoto, October 2024").
-- [ ] **A11Y-05**: Photo overlays have `alt` from user-entered captions; empty-alt if no caption.
-- [ ] **A11Y-06**: Detail sheet has focus trap, `Esc` closes.
-- [ ] **A11Y-07**: Overlay text passes WCAG AA contrast on bright-photo worst case (gradient scrim ensures it).
-- [ ] **A11Y-08**: Keyboard controls: ←/→ chapter prev/next, ↑/↓ chapter prev/next, Space play/pause, Enter open detail.
+- [x] **A11Y-01**: Reduced-motion path passes axe-core with 0 violations.
+- [x] **A11Y-02**: Keyboard-only path completes "add a city" flow without a mouse.
+- [x] **A11Y-03**: Reel container is `role="region"` with `aria-label` (not `application` — known footgun).
+- [x] **A11Y-04**: Chapter transitions fire `aria-live="polite"` announcement ("Kyoto, October 2024").
+- [x] **A11Y-05**: Photo overlays have `alt` from user-entered captions; empty-alt if no caption.
+- [x] **A11Y-06**: Detail sheet has focus trap, `Esc` closes.
+- [x] **A11Y-07**: Overlay text passes WCAG AA contrast on bright-photo worst case (gradient scrim ensures it).
+- [x] **A11Y-08**: Keyboard controls: ←/→ chapter prev/next, ↑/↓ chapter prev/next, Space play/pause, Enter open detail.
 
 ### PERF — Performance budgets
 
@@ -95,9 +95,9 @@ Requirements for v1 launch. Each maps to roadmap phases.
 - [ ] **MP4-01** (rung 1, server-side): BullMQ + Redis + Puppeteer + MapLibre + FFmpeg renders 300-frame benchmark in ≤ 90s wall-clock.
 - [ ] **MP4-02** (rung 1 if pass): Concurrency=1, per-user 5 renders / 24h DB-enforced rate limit, 5-min job timeout.
 - [ ] **MP4-03** (rung 1 if pass): Time-limited PAR for download, notification row inserted, frontend polls `/api/notifications?since=:ts` every 5s while render active.
-- [ ] **MP4-04** (rung 2 fallback if rung 1 fails): Client `MediaRecorder` + `canvas.captureStream(30)`. iOS 17+ capability probe; codec order avc1 → vp9 → vp8.
-- [ ] **MP4-05** (rung 3 fallback if rung 2 fails): 10-second looping GIF export.
-- [ ] **MP4-06** (cut path): If all three rungs fail, MP4 is cut from v1 and shipped as v2 feature. Launch proceeds.
+- [~] **MP4-04** (rung 2 fallback if rung 1 fails): Client `MediaRecorder` + `canvas.captureStream(30)`. iOS 17+ capability probe; codec order avc1 → vp9 → vp8. *(cut from v1 per Branch D; v2 backlog — see `TODOS.md` "v2 — MP4 export" + `.planning/TODOS.md` "Phase 11 — Deferred to v1.1")*
+- [~] **MP4-05** (rung 3 fallback if rung 2 fails): 10-second looping GIF export. *(cut from v1 per Branch D; v2 backlog — see `TODOS.md` "v2 — MP4 export" + `.planning/TODOS.md` "Phase 11 — Deferred to v1.1")*
+- [x] **MP4-06** (cut path): If all three rungs fail, MP4 is cut from v1 and shipped as v2 feature. Launch proceeds. *(cut PATH itself shipped — documented as cut in `.planning/phases/11-mp4-rung-2-3-or-mobile-polish-a11y-audit/11-SUMMARY.md`)*
 
 ## v2 Requirements
 
@@ -146,7 +146,7 @@ Mapping of requirements to roadmap phases. Updated as `ROADMAP.md` evolves.
 | REEL-07 | Phase 2 (W2) | Pending |
 | REEL-08 | Phase 7 (W7) | Pending |
 | REEL-09 | Phase 6 (W6) | ✓ Done |
-| A11Y-01..08 | Phase 11 (W11) | Pending |
+| A11Y-01..08 | Phase 11 (W11) | ✓ Done |
 | PERF-01..05 | Phase 2 (W2) | Pending |
 | APP-01..03 | Phase 3 (W3) | Pending |
 | AUTH-01..04 | Phase 4 (W4) | Pending |
@@ -163,7 +163,7 @@ Mapping of requirements to roadmap phases. Updated as `ROADMAP.md` evolves.
 | DEPLOY-07 | Phase 08.1 | Complete |
 | ERR-01..04 | Phase 9 (W9) | Pending |
 | MP4-01..03 | Phase 10 (W10) | Pending |
-| MP4-04..06 | Phase 11 (W11) | Pending |
+| MP4-04..06 | Phase 11 (W11) | MP4-04/05 cut to v2; MP4-06 ✓ Done (Branch D documented) |
 
 **Coverage:**
 - v1 requirements: 51 total
