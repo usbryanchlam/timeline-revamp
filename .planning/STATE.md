@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: executing
-stopped_at: v0.2.4 live; UAT round closed; Phase 11 mobile polish + a11y branch chosen as next
-last_updated: "2026-06-20T04:54:45.070Z"
-last_activity: 2026-06-20 -- Phase 11 execution started
+status: complete
+stopped_at: Phase 11 (Branch D) complete; A11Y-01..08 + MP4-04/05/06 closed; next is Phase 12 launch polish
+last_updated: "2026-06-20T05:30:00.000Z"
+last_activity: 2026-06-20 -- Phase 11 complete; Branch D shipped (mobile polish + a11y + MP4 cut docs)
 progress:
   total_phases: 13
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 32
-  completed_plans: 24
-  percent: 75
+  completed_plans: 27
+  percent: 84
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-04-27)
 
 **Core value:** The motion — camera flies like a movie. Apple Maps Flyover / Apple Weather as the polish bar.
-**Current focus:** Phase 11 — mp4-rung-2-3-or-mobile-polish-a11y-audit
+**Current focus:** Phase 11 (Branch D) shipped — A11Y-01..08 closed, MP4 cut from v1 documented, CTA pill DESIGN.md:72 lock restored. Next: Phase 12 launch polish + resume copy + v1.0.0 tag.
 
 ## Current Position
 
-Phase: 11 (mp4-rung-2-3-or-mobile-polish-a11y-audit) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 11
-Last activity: 2026-06-20 -- Phase 11 execution started
+Phase: 11 (mp4-rung-2-3-or-mobile-polish-a11y-audit) — VERIFIED (Branch D)
+Plan: 3 of 3 complete; 11-SUMMARY.md + 11-VERIFICATION.md committed
+Status: Phase 11 shipped — Branch D (mobile polish + a11y audit + MP4 cut docs)
+Last activity: 2026-06-20 -- Phase 11 complete; 463/463 vitest tests pass; CTA pill DESIGN.md:72 lock restored under prefers-color-scheme: light
 
-Progress: [████████░░░░] 67% (8 of 12 phases complete)
+Progress: [█████████░░░] 75% (9 of 12 phases complete)
 
 ## Performance Metrics
 
