@@ -79,9 +79,14 @@ Phase 11 is the **mobile polish + a11y audit** branch of the Phase 11 fork. Phas
 
 ### Claude's Discretion
 - Exact file paths for the FPS counter, Lighthouse baseline report, visual-review screenshots
-- Specific axe-core wrapper choice (@axe-core/react for dev console vs. @axe-core/playwright for CI-style assertion)
-- How to source the Auth0 suggestion (nickname vs. email local-part vs. both with fallback)
-- Whether to split the 5 triage items into 2 plans or 3 plans (ROADMAP says 2-3, branch-dependent; planner decides based on dependency analysis)
+- Whether to split the 5 triage items into 2 plans or 3 plans (ROADMAP says 2-3, branch-dependent; planner decides based on dependency analysis — researcher recommended 3-plan split)
+
+### Post-research decisions (added 2026-06-19, after RESEARCH.md)
+
+- **A11Y-08 arrow-key semantics (LOCKED)**: Keep current `←/→ = JUMP_CHAPTER` (prev/next chapter) behavior. Phase 11 edits `.planning/REQUIREMENTS.md` line 31 to reflect the shipped semantics (`←/→ chapter prev/next, ↑/↓ scrub ±1s` OR drop the `←/→ scrub` line). Rationale: gesture-machine semantics are already documented in code; conflating arrow-keys with scrub risks motion-coherence regression. Plan must include a REQUIREMENTS.md edit task.
+- **Photo modals (LOCKED)**: Convert `PhotoDetailSheet` and `PhotoViewer` to native `<dialog>` (matches `HandlePickerModal` pattern). Reuse the close-watcher anti-modal-trap pattern (document-level keydown capture-phase listener + `cancel` preventDefault) from the project memory. Visual-layout regression must be verified via the visual-review matrix screenshots — flag any centering/backdrop drift.
+- **axe-core toolchain (LOCKED via RESEARCH.md)**: `@chialab/vitest-axe@0.19.1` (active fork) + `@axe-core/playwright@4.11.3` for contrast/focus-visible rules that jsdom can't compute. `@axe-core/react` is OUT (no React 18+ support).
+- **UI-SPEC.md (LOCKED)**: Skip — Phase 11 is polish, not new UI. Plans reference `DESIGN.md` directly. `--skip-ui` semantics applied to this run.
 
 </decisions>
 
