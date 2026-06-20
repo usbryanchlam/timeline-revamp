@@ -3,6 +3,12 @@
 Deferred items from v1 design (`~/.gstack/projects/usbryanchlam-timeline-revamp/bryanlam-main-design-20260423-104825.md`).
 Each entry is What / Why / Pros / Cons / Context / Depends-on.
 
+## v2 — MP4 export (cut from v1 per Phase 11 Branch D)
+
+- MP4-04 (rung 2 fallback): Client `MediaRecorder` + `canvas.captureStream(30)` — cut from v1 per Phase 11 Branch D selection (Phase 10 server-side MP4 stayed on hold; Branches A/B/C not pursued). Revisit in v2.
+- MP4-05 (rung 3 fallback): 10-second looping GIF export — cut from v1 per Phase 11 Branch D selection. Revisit in v2.
+- MP4-06 (cut path): Documented in `.planning/phases/11-mp4-rung-2-3-or-mobile-polish-a11y-audit/11-SUMMARY.md` Branch D narrative. The requirement ("If all three rungs fail, MP4 is cut from v1 and shipped as v2 feature") is satisfied by this documentation.
+
 ## v2 — Product features
 
 ### Trip-grouping entity

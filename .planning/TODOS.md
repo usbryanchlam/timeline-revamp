@@ -13,6 +13,13 @@
 
 - **Plan path naming drift:** 06-03-PLAN.md scope block named the route `AppTripsRoute.tsx` but the actual file is `src/routes/TripsRoute.tsx`. Future plans should grep the filesystem first instead of trusting historical plan names.
 
+## Phase 11 — Deferred to v1.1
+
+- **MP4 cut from v1** (Branch D selection): MP4-04 (rung 2 MediaRecorder) and MP4-05 (rung 3 GIF) cut from v1; MP4-06 (cut path) satisfied by `.planning/phases/11-mp4-rung-2-3-or-mobile-polish-a11y-audit/11-SUMMARY.md` Branch D narrative. Phase 10 server-side rung 1 remains on hold. Tracking entry for v2 (`TODOS.md` "v2 — MP4 export").
+- **iOS globe projection rendering** (deferred Phase 7 mobile UAT item #2): Playwright WebKit emulation on macOS does not exercise iOS Metal/GPU stack; bug cannot be closed by the v1.0.0 visual-review matrix. Carries to v1.1 — needs real-iPhone capture against `/` or `/u/:handle` reel + side-by-side comparison of globe-curvature artifacts.
+- **Populated `/u/:handle` real-device UAT**: v1.0.0 matrix captured the NotFound state because `vite preview` lacks a backend. Real-device UAT against the deployed stack (post-Phase 12 deploy) should re-verify with seeded data.
+- **Authenticated `/app/*` real-device UAT**: v1.0.0 matrix captured the logged-out splash because no Auth0 session was seeded. Real-device UAT after Auth0 login should re-verify authenticated UI on each route.
+
 ## Deferred from Phase 11 (v1.0.0 Lighthouse miss → v1.1)
 
 The v1.0.0 mobile Lighthouse baseline (`docs/lighthouse/v1.0.0-baseline.json`)
