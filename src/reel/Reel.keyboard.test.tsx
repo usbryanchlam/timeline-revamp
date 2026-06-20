@@ -19,7 +19,9 @@ import { render, fireEvent } from '@testing-library/react';
 // usePrefersReducedMotion(window.matchMedia(...)). jsdom does not implement it.
 function installMatchMedia(): void {
   if (typeof window === 'undefined') return;
-  if (window.matchMedia) return;
+  // TS declares window.matchMedia as always-defined, but jsdom omits it.
+  // Cast to unknown so the runtime guard compiles.
+  if ((window as unknown as { matchMedia?: unknown }).matchMedia) return;
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,
@@ -100,7 +102,8 @@ describe('Reel keyboard handlers — A11Y-08 close-out', () => {
   it('renders without throwing under the mocked gesture machine', () => {
     render(<Reel />);
     // Sanity: mocked useGestureMachine produced an IDLE state, Reel rendered.
-    expect((useGestureMachine as unknown) instanceof Function).toBe(true);
+    // Sanity check that the mocked hook is a function (we mocked it above).
+    expect(typeof useGestureMachine).toBe('function');
   });
 
   it('exposes onOpenDetail callback to the gesture hook', () => {

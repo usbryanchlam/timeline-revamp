@@ -7,6 +7,7 @@ import { useBearingOrbit } from '@/reel/useBearingOrbit';
 import { ChapterOverlay } from '@/reel/ChapterOverlay';
 import { CTAPill } from '@/reel/CTAPill';
 import { STYLE_URL } from '@/reel/mapStyle';
+import { FpsBadge } from '@/dev/FpsBadge';
 
 export interface OrbitReelProps {
   readonly city: CityDTO;
@@ -79,6 +80,12 @@ export function OrbitReel({ city, photos }: OrbitReelProps) {
       <div ref={containerRef} className="absolute inset-0" />
       <ChapterOverlay chapter={chapter} chapterNumber={1} totalChapters={1} />
       <CTAPill />
+      {/* DEV-only FPS readout for the 8s orbit (closes Phase 7 UAT #1). The
+          literal `import.meta.env.DEV` is replaced with `false` by Vite at
+          prod build time, and Rollup's minifier dead-codes the whole branch
+          including the FpsBadge import binding — verified by
+          `bun run verify:tree-shake`. */}
+      {import.meta.env.DEV && <FpsBadge />}
     </div>
   );
 }
