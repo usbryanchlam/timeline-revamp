@@ -695,22 +695,18 @@ Not applicable — Phase 11 is greenfield instrumentation + a11y audit + visual 
 
 **Resolution path for A2/A3:** Both should be discussed in the plan-time discuss-phase if the planner decides — they're locked acceptance criteria per CONTEXT.md so the planner should treat them as targets and design the "what if it misses" branch into the plan.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **A11Y-08 `←/→` semantics: scrub vs. jump?**
-   - What we know: REQUIREMENTS.md says `←/→ scrub ±1s, ↑/↓ chapter prev/next`. Current code does `←/→ JUMP_CHAPTER` (`useGestureMachine.ts:265-273`).
-   - What's unclear: Does scrubbing make sense for a reel without continuous playback time? "Scrub ±1s" maps weakly onto a discrete-chapter model. If we honor the spec literally, we need a `SCRUB` event in the state machine.
-   - Recommendation: planner should propose interpretation (option A: keep current `←/→ = jump`, document spec deviation; option B: implement scrub via animating the scrub cursor on `state.scrubT` ±0.1 for 1s of dwell). Decide in discuss-phase before locking the task.
+1. **A11Y-08 `←/→` semantics: scrub vs. jump?** — **RESOLVED 2026-06-19 (user, post-research)**
+   - Decision: Keep current `←/→ = JUMP_CHAPTER`. Edit `.planning/REQUIREMENTS.md` line 31 to drop `←/→ scrub` and align with shipped semantics.
+   - See: CONTEXT.md → "Post-research decisions" → A11Y-08 lock.
 
-2. **PhotoDetailSheet: convert to native `<dialog>` or keep custom modal?**
-   - What we know: Custom modal currently uses `<div role="dialog">` (no focus trap). Native `<dialog>` would give focus trap free + match HandlePickerModal.
-   - What's unclear: Conversion may have visual side-effects (backdrop, m-auto centering). Need to verify the existing responsive layout (bottom-sheet on mobile, centered modal on md+) survives.
-   - Recommendation: planner picks native `<dialog>` as the default; if visual regressions surface during the task, fall back to a manual focus-trap component (first/last sentinel pattern).
+2. **PhotoDetailSheet: convert to native `<dialog>` or keep custom modal?** — **RESOLVED 2026-06-19 (user, post-research)**
+   - Decision: Convert PhotoDetailSheet + PhotoViewer to native `<dialog>` using the close-watcher anti-modal-trap pattern (`feedback_dialog_double_esc.md`). Visual regression verified via the visual-review matrix screenshots.
+   - See: CONTEXT.md → "Post-research decisions" → Photo modals lock.
 
-3. **Should visual-review matrix be 5×2=10 screenshots or 5×2×(portrait+landscape)=20?**
-   - What we know: CONTEXT.md says "5 routes × 2 themes = 10 screenshots."
-   - What's unclear: iPhone is mobile-first; landscape isn't a design surface. But iPad portrait differs from iPhone portrait.
-   - Recommendation: stick with 10 (iPhone portrait, light+dark). Optionally add iPad portrait as 5 more if planner sees budget. CONTEXT spec wins.
+3. **Should visual-review matrix be 5×2=10 screenshots or 5×2×(portrait+landscape)=20?** — **RESOLVED 2026-06-19 (CONTEXT.md lock)**
+   - Decision: 10 screenshots (5 routes × 2 themes, iPhone portrait). CONTEXT spec wins.
 
 ## Environment Availability
 
