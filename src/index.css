@@ -48,6 +48,26 @@
          amber-600 (#E8B040) directly. */
       color-scheme: light;
     }
+
+    /* DESIGN.md:72 lock — public reel surface (animated + reduced-motion) is
+       ALWAYS dark. Re-assert dark tokens on the reel container so descendants
+       (glass-pill CTA, text-ink labels, bg-bg-elev surfaces) inherit the dark
+       palette regardless of OS theme. Without this, the CTAPill's
+       `glass-pill` (color-mix on --color-bg-elev) flips to a near-white
+       translucent pill and `text-ink` becomes dark — the pill washes out and
+       the amber accent loses contrast. Scoped to the reel root, so the
+       authenticated /app chrome around an embedded reel still themes
+       normally; only the reel surface itself is locked. */
+    .reel-root,
+    .reel-static-root {
+      --color-bg: #0a0e1a;
+      --color-bg-elev: #101522;
+      --color-ink: #f7f8fb;
+      --color-ink-dim: #a8b0c2;
+      --color-ink-mute: #6b7488;
+      --color-line: #1b2235;
+      color-scheme: dark;
+    }
   }
 
   html,
