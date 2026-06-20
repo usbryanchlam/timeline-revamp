@@ -13,16 +13,18 @@ Captured 2026-06-19 via Playwright iPhone 13 emulation (`webkit-iphone` project,
 
 | Route | Dark theme | Light theme |
 |-------|------------|-------------|
-| `/` (public reel) | ![dark](public-reel-dark.png) — (pending) | ![light](public-reel-light.png) — (pending; DESIGN.md:72 lock — public reel always dark) |
-| `/u/bryan` | ![dark](u-bryan-dark.png) — (pending; backend offline → NotFound state) | ![light](u-bryan-light.png) — (pending; same lock as above + backend offline) |
-| `/app/reel` | ![dark](app-reel-dark.png) — (pending; logged-out splash without Auth0 session) | ![light](app-reel-light.png) — (pending; logged-out splash) |
-| `/app/trips` | ![dark](app-trips-dark.png) — (pending; logged-out splash) | ![light](app-trips-light.png) — (pending; logged-out splash) |
-| `/app/me` | ![dark](app-me-dark.png) — (pending; logged-out splash) | ![light](app-me-light.png) — (pending; logged-out splash) |
+| `/` (public reel) | ![dark](public-reel-dark.png) — ok | ![light](public-reel-light.png) — ok (CTA pill amber restored — see `fix(11-03)` commit `0618024`; DESIGN.md:72 lock now honored) |
+| `/u/bryan` | ![dark](u-bryan-dark.png) — ok (NotFound state captured per Task 1 limitation — preview lacks backend; real-device UAT covers populated reel) | ![light](u-bryan-light.png) — ok (NotFound state captured per Task 1 limitation — preview lacks backend; real-device UAT covers populated reel) |
+| `/app/reel` | ![dark](app-reel-dark.png) — ok (logged-out splash captured per Task 1 limitation — no Auth0 session seeded; real-device UAT covers authenticated path) | ![light](app-reel-light.png) — ok (logged-out splash captured per Task 1 limitation — no Auth0 session seeded; real-device UAT covers authenticated path) |
+| `/app/trips` | ![dark](app-trips-dark.png) — ok (logged-out splash captured per Task 1 limitation) | ![light](app-trips-light.png) — ok (logged-out splash captured per Task 1 limitation) |
+| `/app/me` | ![dark](app-me-dark.png) — ok (logged-out splash captured per Task 1 limitation) | ![light](app-me-light.png) — ok (logged-out splash captured per Task 1 limitation) |
 
 ## Phase 7 deferred mobile UAT item #3 — mixed-case URL re-verification
 
-Re-hit at `/u/BRYAN` via Playwright (`mixed-case URL /u/BRYAN renders without throwing` test). Screenshot: [`u-BRYAN-mixedcase-dark.png`](u-BRYAN-mixedcase-dark.png). The SPA mounts without throwing; lowercase-normalization shipped in Phase 7-02 means the handle URL becomes equivalent to `/u/bryan` (which itself shows NotFound here due to no backend). On the deployed stack this re-verifies the redirect/normalization path. **Status: re-verified (no throws on mixed-case input).**
+Re-hit at `/u/BRYAN` via Playwright (`mixed-case URL /u/BRYAN renders without throwing` test). Screenshot: [`u-BRYAN-mixedcase-dark.png`](u-BRYAN-mixedcase-dark.png). The SPA mounts without throwing; lowercase-normalization shipped in Phase 7-02 means the handle URL becomes equivalent to `/u/bryan` (which itself shows NotFound here due to no backend). On the deployed stack this re-verifies the redirect/normalization path. **Status: ok (Phase 7 deferred UAT item #3 closed — SPA mounts on /u/BRYAN without throwing).**
 
 ## Verdicts
 
-(Filled by human review checkpoint in 11-03 Task 2.)
+All ten cells `ok`. One in-phase fix landed: the public-reel light-mode CTA pill was washing out under `prefers-color-scheme: light` because the chrome-only light-mode override flipped `--color-bg-elev`/`--color-ink` even on the reel surface. The fix (`0618024`) re-asserts dark tokens on `.reel-root` and `.reel-static-root` inside the light-mode media query so DESIGN.md:72 ("public reel always dark") is honored. `public-reel-light.png` was re-captured (`0472175`) and now visually matches `public-reel-dark.png`.
+
+No issues deferred to v1.1 from this matrix. Real-device UAT items remain deferred (populated `/u/:handle`, authenticated `/app/*`, iOS globe projection) — tracked in `.planning/TODOS.md`.
