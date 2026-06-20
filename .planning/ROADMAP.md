@@ -246,11 +246,12 @@ Plans:
   - **Branch B** (Phase 10 server failed → try client `MediaRecorder`): iOS 17+ probe works; codec ladder avc1 → vp9 → vp8 picks first supported.
   - **Branch C** (Branches A+B both failed → 10s GIF): GIF export ships, document as fallback.
   - **Branch D** (all three failed): MP4 cut from v1, documented; weekend used for axe-core audit + iPhone SE / Pixel 7 / iPad real-device polish.
-**Plans**: 2-3 plans (TBD, branch-dependent)
+**Plans**: 3 plans (Branch D selected — MP4 cut from v1; mobile polish + a11y audit)
 
 Plans:
-- [ ] 11-01: (branch-dependent — chosen at start of phase)
-- [ ] 11-02: A11y audit + mobile polish (always runs, even on Branches A-C as tail-end work)
+- [ ] 11-01-PLAN.md — A11y infrastructure (axe-core + Playwright + Lighthouse install), reduced-motion landmark fixes, aria-live arrival alignment, PhotoDetailSheet+PhotoViewer native <dialog> conversion + close-watcher anti-modal-trap [A11Y-01, A11Y-03, A11Y-04, A11Y-05, A11Y-06, A11Y-07]
+- [ ] 11-02-PLAN.md — Keyboard handlers (Enter→OPEN_DETAIL) + REQUIREMENTS.md A11Y-08 edit + F8 suggestHandle tests + dev-only useFrameRate hook + FpsBadge (tree-shake guarded) + Lighthouse v1.0.0 mobile baseline [A11Y-02, A11Y-08]
+- [ ] 11-03-PLAN.md — Playwright iPhone visual-review matrix (5 routes × 2 themes) + INDEX.md verdicts + MP4-04/05/06 cut documentation + 11-SUMMARY.md phase rollup [MP4-04, MP4-05, MP4-06]
 
 ### Phase 12: Launch polish + resume copy
 **Goal**: Ship to `main`, tag `v1.0.0`. Real device testing. OG image. Recruiter FAQ. Portfolio link. LinkedIn post. First monitoring dashboard.
