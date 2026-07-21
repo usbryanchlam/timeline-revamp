@@ -8,7 +8,7 @@ A cinematic mobile-first travel-memory reel where the map is the canvas and time
 
 ## Why this exists
 
-Portfolio piece. Built solo across 12 weekends to demonstrate a modern React + TypeScript stack, a full-stack owned deployment (auth, database, object storage, CI/CD — no Vercel, no Supabase), and a design bar most travel apps skip: the motion itself has to feel like Apple Maps Flyover.
+Portfolio piece. Built solo to demonstrate a modern React + TypeScript stack, a full-stack owned deployment (auth, database, object storage, CI/CD — no Vercel, no Supabase), and a design bar most travel apps skip: the motion itself has to feel like Apple Maps Flyover.
 
 The core value is **the motion**. If everything else fails, the cinematic `flyTo` between chapters must feel like a movie.
 
@@ -98,10 +98,6 @@ Requires: Bun, Docker (for Postgres via `bun run db:up`), a `.env.local` with `V
 ### Map tiles
 
 By default, MapLibre falls back to public demotiles (gray world-level polygons — fine for offline dev, not cinematic). For the real experience, get a free key at [maptiler.com](https://www.maptiler.com/) (100k requests/month free) and set `VITE_MAPTILER_KEY` in `.env.local`.
-
-### iPhone dev over LAN
-
-Auth0's SPA SDK requires a secure origin. On iPhone hitting `http://192.168.x.x:5173`, you'll see `auth0-spa-js must run on a secure origin`. Fix: `mkcert` + Vite HTTPS (Vite auto-detects `.dev/certs/localhost+2.pem` per `vite.config.ts:11-18`).
 
 ## Reference
 
