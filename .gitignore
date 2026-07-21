@@ -73,3 +73,6 @@ progress*.md
 tfplan
 crash.log
 crash.*.log
+
+# Claude Code local session state (permission allowlist, worktree scratch, scheduled-task locks)
+.claude/
