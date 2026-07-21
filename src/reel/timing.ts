@@ -6,14 +6,14 @@
  *  chapter. This is post-landing time only — IDLE is entered *after*
  *  CHAPTER_FLY_DONE fires, so total per-chapter cycle is
  *  FLY_DURATION_MS + AUTOPLAY_DWELL_MS. Currently in UAT tuning. */
-export const AUTOPLAY_DWELL_MS = 8000 as const;
+export const AUTOPLAY_DWELL_MS = 5000 as const;
 
 /** Photo crossfade duration inside a chapter. */
 export const CROSSFADE_MS = 200 as const;
 
 /** Floor on per-photo display time. Below this, the crossfade dominates and
- *  the photo barely registers visually. With 6+ photos in a chapter at the
- *  current 4500ms dwell, the dynamic divide hits the floor — later photos
+ *  the photo barely registers visually. With 7+ photos in a chapter at the
+ *  current 5000ms dwell, the dynamic divide hits the floor — later photos
  *  wait for the user's next visit to that chapter. */
 export const MIN_CYCLE_INTERVAL_MS = 800 as const;
 
