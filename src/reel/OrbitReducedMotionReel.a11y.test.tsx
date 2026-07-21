@@ -24,7 +24,7 @@ const mockCity: CityDTO = {
 };
 
 const mockPhotos: readonly PublicReelPhotoDTO[] = [
-  { id: 'p1', masterUrl: 'https://example.com/m1.jpg', thumbUrl: 'https://example.com/t1.jpg', orderIndex: 0 },
+  { id: 'p1', cityId: mockCity.id, masterUrl: 'https://example.com/m1.jpg', thumbUrl: 'https://example.com/t1.jpg', orderIndex: 0 },
 ];
 
 describe('OrbitReducedMotionReel — A11Y-01 hard gate + A11Y-03 landmark', () => {
